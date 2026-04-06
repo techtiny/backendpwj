@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mysql -u root pwj_tracker -e \"SELECT COUNT\\(*\\) as total FROM pwj_entry; SELECT COUNT\\(*\\) as vendors FROM vendor;\")"
+    ]
+  }
+}
