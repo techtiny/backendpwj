@@ -117,6 +117,15 @@ public class PwjEntry {
     @Column(name = "doc_comments", columnDefinition = "TEXT")
     private String docComments;
 
+    @Column(name = "doc_data", columnDefinition = "TEXT")
+    private String docData;
+
+    @Column(name = "dependency", length = 300)
+    private String dependency;
+
+    @Column(name = "ack")
+    private Boolean ack;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

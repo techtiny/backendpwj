@@ -55,6 +55,7 @@ public class UserService {
                 .password(req.getPassword()) // hash in production
                 .fullName(req.getFullName())
                 .email(req.getEmail())
+                .phone(req.getPhone())
                 .role(req.getRole())
                 .active(true)
                 .build();
@@ -71,6 +72,15 @@ public class UserService {
     public List<UserDto.UserResponse> getEngineers() {
         return userRepository.findByRoleAndActiveTrue(AppUser.Role.ENGINEER)
                 .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    // ── Update phone ──
+    @Transactional
+    public UserDto.UserResponse updatePhone(Long id, String phone) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setPhone(phone);
+        return toResponse(userRepository.save(user));
     }
 
     // ── Deactivate user ──
@@ -96,6 +106,7 @@ public class UserService {
         return UserDto.UserResponse.builder()
                 .id(u.getId()).username(u.getUsername())
                 .fullName(u.getFullName()).email(u.getEmail())
+                .phone(u.getPhone())
                 .role(u.getRole()).active(u.getActive())
                 .createdAt(u.getCreatedAt()).build();
     }

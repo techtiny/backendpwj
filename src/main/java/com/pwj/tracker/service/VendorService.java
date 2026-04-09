@@ -55,7 +55,7 @@ public class VendorService {
 
     // ── Get all vendors with any status (for VP/Procurement status view) ─
     public List<Vendor> getAllVendorsWithStatus() {
-        return vendorRepository.findAllByOrderByCreatedAtDesc();
+        return vendorRepository.findAllByOrderByUpdatedAtDesc();
     }
 
     // ── Look up vendor by name (for document generation) ─────────────────
@@ -160,6 +160,28 @@ public class VendorService {
         v.setTags(req.getTags());
         v.setVendorDocUrl(req.getVendorDocUrl());
 
+        v.setCompanyType(req.getCompanyType());
+        v.setVendorType(req.getVendorType());
+        v.setSpocName(req.getSpocName());
+        v.setSpocEmail(req.getSpocEmail());
+        v.setSpocPhone(req.getSpocPhone());
+        v.setBranch(req.getBranch());
+        v.setProductServices(req.getProductServices());
+        v.setSocialMedia(req.getSocialMedia());
+        v.setPanNumber(req.getPanNumber());
+        v.setTanNumber(req.getTanNumber());
+        v.setCinNumber(req.getCinNumber());
+        v.setMsmeNumber(req.getMsmeNumber());
+        v.setGstDocUrl(req.getGstDocUrl());
+        v.setMsmeDocUrl(req.getMsmeDocUrl());
+        v.setTanDocUrl(req.getTanDocUrl());
+        v.setPanDocUrl(req.getPanDocUrl());
+
+        if (req.getEmpanelDate() != null && !req.getEmpanelDate().isBlank()) {
+            try { v.setEmpanelDate(LocalDate.parse(req.getEmpanelDate())); }
+            catch (DateTimeParseException e) { log.warn("Invalid empanelDate: {}", req.getEmpanelDate()); }
+        }
+
         v.setVendorCode(req.getVendorCode());
         v.setWebsite(req.getWebsite());
         v.setCurrency(req.getCurrency());
@@ -173,6 +195,7 @@ public class VendorService {
         v.setAccountNumber(req.getAccountNumber());
         v.setIfscCode(req.getIfscCode());
         v.setBankDetails(req.getBankDetails());
+        v.setBankDocUrl(req.getBankDocUrl());
         v.setPaymentDetails(req.getPaymentDetails());
         v.setDeliveryTerms(req.getDeliveryTerms());
         v.setSameAddressForBillingShipping(req.getSameAddressForBillingShipping());

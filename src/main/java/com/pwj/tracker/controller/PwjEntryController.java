@@ -27,8 +27,8 @@ public class PwjEntryController {
             @RequestParam(required = false)     String projectName,
             @RequestParam(defaultValue = "0")   int    page,
             @RequestParam(defaultValue = "15")  int    size,
-            @RequestParam(defaultValue = "id")  String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
+            @RequestParam(defaultValue = "desc")      String sortDir) {
         return ResponseEntity.ok(ApiResponse.ok("Entries fetched",
                 service.getAll(search, status, approval, projectName, page, size, sortBy, sortDir)));
     }
@@ -49,7 +49,9 @@ public class PwjEntryController {
 
     @PostMapping("/entries")
     public ResponseEntity<ApiResponse<PwjEntryResponse>> createEntry(
-            @Valid @RequestBody PwjEntryRequest req) {
+            @Valid @RequestBody PwjEntryRequest req,
+            @RequestHeader(value = "X-User-Name", required = false) String userName) {
+        if (userName != null && !userName.isBlank()) req.setRaisedBy(userName);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Entry created", service.create(req)));
     }

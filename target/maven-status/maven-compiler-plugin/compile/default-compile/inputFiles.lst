@@ -3,6 +3,7 @@
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/controller/VendorController.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/model/AppUser.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/service/VendorService.java
+/Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/repository/ProjectRepository.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/service/UserService.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/controller/FileUploadController.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/model/PwjEntry.java
@@ -10,6 +11,8 @@
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/dto/PwjEntryResponse.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/service/PwjEntryService.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/repository/VendorRepository.java
+/Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/model/Project.java
+/Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/controller/ProjectController.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/dto/PwjEntryRequest.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/dto/VendorRequest.java
 /Users/techtiny/Downloads/files/pwj-tracker/backend/src/main/java/com/pwj/tracker/dto/ApiResponse.java

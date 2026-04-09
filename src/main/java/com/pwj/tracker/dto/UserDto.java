@@ -29,6 +29,7 @@ public class UserDto {
         @NotBlank public String password;
         @NotBlank public String fullName;
         public String email;
+        public String phone;
         @NotNull  public AppUser.Role role;
     }
 
@@ -38,6 +39,7 @@ public class UserDto {
         public String username;
         public String fullName;
         public String email;
+        public String phone;
         public AppUser.Role role;
         public Boolean active;
         public LocalDateTime createdAt;

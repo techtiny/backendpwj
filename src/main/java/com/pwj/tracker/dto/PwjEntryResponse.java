@@ -27,13 +27,16 @@ public class PwjEntryResponse {
     private BigDecimal quantity;
     private LocalDate dateOfRequirement;
     private String imageReference;
+    // Dashboard column order: Image → Approval → Vendor → Type → PWJ → ACK → Delivered → Status → Dependency
     private PwjEntry.ApprovalStatus approvalStatus;
     private String vendor;
-    private Boolean pwjIssued;
-    private PwjEntry.EntryStatus status;
-    private LocalDate deliveredDate;
-    private String remarks;
     private String pwjType;
+    private Boolean pwjIssued;
+    private Boolean ack;
+    private LocalDate deliveredDate;
+    private PwjEntry.EntryStatus status;
+    private String dependency;
+    private String remarks;
     private Boolean vendorAcknowledged;
     private LocalDateTime vendorAcknowledgedAt;
     private String deliveryDocUrl;
@@ -43,6 +46,7 @@ public class PwjEntryResponse {
     private String docNumber;
     private PwjEntry.DocStatus docStatus;
     private String docComments;
+    private String docData;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

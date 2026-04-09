@@ -45,8 +45,9 @@ public class PwjEntryService {
         PwjEntry.EntryStatus    statusEnum   = parseEnum(PwjEntry.EntryStatus.class,    status);
         PwjEntry.ApprovalStatus approvalEnum = parseEnum(PwjEntry.ApprovalStatus.class, approval);
 
-        Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Sort.Order primary = sortDir.equalsIgnoreCase("desc")
+                ? Sort.Order.desc(sortBy) : Sort.Order.asc(sortBy);
+        Sort sort = Sort.by(primary, Sort.Order.desc("id"));
         Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<PwjEntry> pageResult = repository.findFiltered(
@@ -60,7 +61,7 @@ public class PwjEntryService {
 
     // ── Engineer: only their own entries ─────────────────────────────────
     public PagedResponse<PwjEntryResponse> getByEngineer(String raisedBy, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.desc("id")));
         Page<PwjEntry> pageResult = repository.findFiltered(
                 null, null, null, null, raisedBy, pageable);
         return buildPagedResponse(pageResult, page, size);
@@ -93,6 +94,7 @@ public class PwjEntryService {
                 .pwjIssued(false)
                 .status(PwjEntry.EntryStatus.OPEN)
                 .remarks(req.getRemarks())
+                .dependency(req.getDependency())
                 .build();
         return toResponse(repository.save(entry));
     }
@@ -118,6 +120,9 @@ public class PwjEntryService {
         entry.setStatus(req.getStatus());
         entry.setDeliveredDate(req.getDeliveredDate());
         entry.setRemarks(req.getRemarks());
+        if (req.getDocData() != null) entry.setDocData(req.getDocData());
+        if (req.getDocNumber() != null && !req.getDocNumber().isBlank()) entry.setDocNumber(req.getDocNumber());
+        entry.setDependency(req.getDependency());
         return toResponse(repository.save(entry));
     }
 
@@ -127,11 +132,14 @@ public class PwjEntryService {
         PwjEntry entry = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
 
-        if (req.getVendor()    != null) entry.setVendor(req.getVendor());
-        if (req.getPwjIssued() != null) entry.setPwjIssued(req.getPwjIssued());
-        if (req.getStatus()    != null) entry.setStatus(req.getStatus());
+        if (req.getVendor()      != null) entry.setVendor(req.getVendor());
+        if (req.getPwjIssued()   != null) entry.setPwjIssued(req.getPwjIssued());
+        if (req.getStatus()      != null) entry.setStatus(req.getStatus());
         if (req.getDeliveredDate() != null) entry.setDeliveredDate(req.getDeliveredDate());
-        if (req.getRemarks()   != null) entry.setRemarks(req.getRemarks());
+        if (req.getRemarks()     != null) entry.setRemarks(req.getRemarks());
+        if (req.getDependency()  != null) entry.setDependency(req.getDependency());
+        if (req.getAck()         != null) entry.setAck(req.getAck());
+        if (req.getDocData()     != null) entry.setDocData(req.getDocData());
 
         // PWJ Type: set and trigger vendor email if entry is already PROCEED
         if (req.getPwjType() != null && !req.getPwjType().isBlank()) {
@@ -398,6 +406,9 @@ public class PwjEntryService {
                 .approvedBy(e.getApprovedBy()).approvedAt(e.getApprovedAt())
                 .docNumber(e.getDocNumber()).docStatus(e.getDocStatus())
                 .docComments(e.getDocComments())
+                .docData(e.getDocData())
+                .dependency(e.getDependency())
+                .ack(Boolean.TRUE.equals(e.getAck()))
                 .createdAt(e.getCreatedAt()).updatedAt(e.getUpdatedAt())
                 .build();
     }

@@ -37,6 +37,13 @@ public class UserController {
                 .body(ApiResponse.ok("User created", userService.createUser(req)));
     }
 
+    /** PATCH /api/v1/users/{id}/phone — Admin: update user phone */
+    @PatchMapping("/{id}/phone")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> updatePhone(
+            @PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Phone updated", userService.updatePhone(id, body.get("phone"))));
+    }
+
     /** DELETE /api/v1/users/{id} — Admin: deactivate user */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable Long id) {

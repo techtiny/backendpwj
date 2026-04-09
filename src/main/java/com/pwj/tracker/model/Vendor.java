@@ -50,6 +50,60 @@ public class Vendor {
     @Column(name = "vendor_doc_url", length = 500)
     private String vendorDocUrl;
 
+    @Column(name = "company_type", length = 100)
+    private String companyType;
+
+    @Column(name = "vendor_type", length = 100)
+    private String vendorType;
+
+    // ── SPOC Details ────────────────────────────────────────────────────
+    @Column(name = "spoc_name", length = 150)
+    private String spocName;
+
+    @Column(name = "spoc_email", length = 150)
+    private String spocEmail;
+
+    @Column(name = "spoc_phone", length = 20)
+    private String spocPhone;
+
+    // ── Additional Info ─────────────────────────────────────────────────
+    @Column(name = "branch", length = 200)
+    private String branch;
+
+    @Column(name = "empanel_date")
+    private LocalDate empanelDate;
+
+    @Column(name = "product_services", columnDefinition = "TEXT")
+    private String productServices;   // JSON: [{category, items:[]}]
+
+    @Column(name = "social_media", columnDefinition = "TEXT")
+    private String socialMedia;       // JSON: [url1, url2, ...]
+
+    // ── Statutory Details ───────────────────────────────────────────────
+    @Column(name = "pan_number", length = 20)
+    private String panNumber;
+
+    @Column(name = "tan_number", length = 20)
+    private String tanNumber;
+
+    @Column(name = "cin_number", length = 25)
+    private String cinNumber;
+
+    @Column(name = "msme_number", length = 30)
+    private String msmeNumber;
+
+    @Column(name = "gst_doc_url", length = 500)
+    private String gstDocUrl;
+
+    @Column(name = "msme_doc_url", length = 500)
+    private String msmeDocUrl;
+
+    @Column(name = "tan_doc_url", length = 500)
+    private String tanDocUrl;
+
+    @Column(name = "pan_doc_url", length = 500)
+    private String panDocUrl;
+
     // ── Vendor Profile ──────────────────────────────────────────────────
     @Column(name = "vendor_code", length = 50)
     private String vendorCode;
@@ -89,6 +143,9 @@ public class Vendor {
 
     @Column(name = "bank_details", columnDefinition = "TEXT")
     private String bankDetails;
+
+    @Column(name = "bank_doc_url", length = 500)
+    private String bankDocUrl;
 
     @Column(name = "payment_details", columnDefinition = "TEXT")
     private String paymentDetails;

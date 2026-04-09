@@ -33,6 +33,9 @@ public class AppUser {
     @Column(name = "email", length = 150)
     private String email;
 
+    @Column(name = "phone", length = 20)
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     private Role role;
@@ -49,6 +52,6 @@ public class AppUser {
     private LocalDateTime updatedAt;
 
     public enum Role {
-        ADMIN, ENGINEER, PROCUREMENT, VP
+        ADMIN, ENGINEER, PROCUREMENT, VP, OH
     }
 }

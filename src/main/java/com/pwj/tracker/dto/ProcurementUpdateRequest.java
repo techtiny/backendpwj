@@ -18,4 +18,7 @@ public class ProcurementUpdateRequest {
     private PwjEntry.EntryStatus status;
     private LocalDate deliveredDate;
     private String remarks;
+    private String dependency;
+    private Boolean ack;
+    private String docData;
 }

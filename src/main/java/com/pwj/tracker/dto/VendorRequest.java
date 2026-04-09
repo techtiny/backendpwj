@@ -25,6 +25,23 @@ public class VendorRequest {
     private String category;
     private String tags;
     private String vendorDocUrl;
+    private String companyType;
+    private String vendorType;
+    private String spocName;
+    private String spocEmail;
+    private String spocPhone;
+    private String branch;
+    private String empanelDate;
+    private String productServices;
+    private String socialMedia;
+    private String panNumber;
+    private String tanNumber;
+    private String cinNumber;
+    private String msmeNumber;
+    private String gstDocUrl;
+    private String msmeDocUrl;
+    private String tanDocUrl;
+    private String panDocUrl;
 
     // ── Vendor Profile ──────────────────────────────────────────
     private String vendorCode;
@@ -40,6 +57,7 @@ public class VendorRequest {
     private String accountNumber;
     private String ifscCode;
     private String bankDetails;
+    private String bankDocUrl;
     private String paymentDetails;
     private String deliveryTerms;
     private String joiningDate;        // "YYYY-MM-DD" string from frontend
@@ -56,4 +74,6 @@ public class VendorRequest {
 
     // ── Workflow status ─────────────────────────────────────────
     private String status;             // "PENDING_APPROVAL" | "APPROVED"
+
+   
 }

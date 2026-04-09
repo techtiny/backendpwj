@@ -16,7 +16,6 @@ public class PwjEntryRequest {
 
     private LocalDateTime timestamp;
 
-    @NotBlank(message = "Raised by is required")
     private String raisedBy;
 
     @NotBlank(message = "Project name is required")
@@ -40,6 +39,9 @@ public class PwjEntryRequest {
     private PwjEntry.EntryStatus status;
     private LocalDate deliveredDate;
     private String remarks;
+    private String docData;
+    private String docNumber;
+    private String dependency;
 }
 
 // ============ Approval Action Request ============
