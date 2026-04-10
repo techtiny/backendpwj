@@ -16,7 +16,6 @@ public class PwjEntryRequest {
 
     private LocalDateTime timestamp;
 
-    @NotBlank(message = "Raised by is required")
     private String raisedBy;
 
     @NotBlank(message = "Project name is required")

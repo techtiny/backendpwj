@@ -52,6 +52,8 @@ public class PwjEntryController {
             @Valid @RequestBody PwjEntryRequest req,
             @RequestHeader(value = "X-User-Name", required = false) String userName) {
         if (userName != null && !userName.isBlank()) req.setRaisedBy(userName);
+        if (req.getRaisedBy() == null || req.getRaisedBy().isBlank())
+            throw new RuntimeException("Raised by is required");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("Entry created", service.create(req)));
     }
