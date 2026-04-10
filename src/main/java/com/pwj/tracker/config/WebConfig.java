@@ -28,6 +28,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .maxAge(3600);
     }
 
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         String absPath = Paths.get(uploadDir).toAbsolutePath().toUri().toString();
