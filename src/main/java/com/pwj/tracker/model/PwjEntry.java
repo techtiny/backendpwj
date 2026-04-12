@@ -1,8 +1,7 @@
 package com.pwj.tracker.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -31,19 +30,16 @@ public class PwjEntry {
     @Column(name = "timestamp")
     private LocalDateTime timestamp;
 
-    @NotBlank(message = "Raised by is required")
-    @Column(name = "raised_by", nullable = false, length = 100)
+    @Column(name = "raised_by", length = 100)
     private String raisedBy;
 
-    @NotBlank(message = "Project name is required")
-    @Column(name = "project_name", nullable = false, length = 200)
+    @Column(name = "project_name", length = 200)
     private String projectName;
 
     @Column(name = "boq_no", length = 50)
     private String boqNo;
 
-    @NotBlank(message = "Material required is mandatory")
-    @Column(name = "material_required", nullable = false, length = 300)
+    @Column(name = "material_required", length = 300)
     private String materialRequired;
 
     @Column(name = "specification", columnDefinition = "TEXT")
