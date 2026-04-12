@@ -67,8 +67,9 @@ public class PwjEntry {
     @Column(name = "vendor", length = 200)
     private String vendor;
 
+    @Builder.Default
     @Column(name = "pwj_issued")
-    private Boolean pwjIssued;
+    private Boolean pwjIssued = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20)
@@ -84,8 +85,9 @@ public class PwjEntry {
     @Column(name = "pwj_type", length = 5)
     private String pwjType;   // "PO", "WO", "JO"
 
+    @Builder.Default
     @Column(name = "vendor_acknowledged")
-    private Boolean vendorAcknowledged;
+    private Boolean vendorAcknowledged = false;
 
     @Column(name = "vendor_acknowledged_at")
     private LocalDateTime vendorAcknowledgedAt;
@@ -119,8 +121,9 @@ public class PwjEntry {
     @Column(name = "dependency", length = 300)
     private String dependency;
 
+    @Builder.Default
     @Column(name = "ack")
-    private Boolean ack;
+    private Boolean ack = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
