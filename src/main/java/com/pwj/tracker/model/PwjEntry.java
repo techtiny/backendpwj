@@ -120,7 +120,7 @@ public class PwjEntry {
     private String dependency;
 
     @Column(name = "ack")
-    private Boolean ack;
+    private Boolean ack = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
