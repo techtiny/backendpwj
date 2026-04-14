@@ -41,8 +41,10 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
     @Query("SELECT DISTINCT e.projectName FROM PwjEntry e ORDER BY e.projectName")
     List<String> findDistinctProjectNames();
 
-    @Query("SELECT e FROM PwjEntry e WHERE e.approvalStatus IN ('HOLD','NOT_APPROVED') AND e.status = 'OPEN'")
-    List<PwjEntry> findPendingApprovals();
+    List<PwjEntry> findByApprovalStatusInAndStatus(
+            List<PwjEntry.ApprovalStatus> statuses,
+            PwjEntry.EntryStatus status
+    );
 
     List<PwjEntry> findByDocStatus(PwjEntry.DocStatus docStatus);
 }

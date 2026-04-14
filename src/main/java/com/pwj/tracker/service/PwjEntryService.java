@@ -211,7 +211,9 @@ public class PwjEntryService {
     }
 
     public List<PwjEntryResponse> getPendingApprovals() {
-        return repository.findPendingApprovals()
+        return repository.findByApprovalStatusInAndStatus(
+                        List.of(PwjEntry.ApprovalStatus.HOLD, PwjEntry.ApprovalStatus.NOT_APPROVED),
+                        PwjEntry.EntryStatus.OPEN)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
