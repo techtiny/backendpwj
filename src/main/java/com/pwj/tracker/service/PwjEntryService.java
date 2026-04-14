@@ -191,8 +191,7 @@ public class PwjEntryService {
         entry.setApprovedBy(req.getApprovedBy());
         entry.setApprovedAt(LocalDateTime.now());
         if (req.getApprovalStatus() == PwjEntry.ApprovalStatus.PROCEED) {
-            entry.setPwjIssued(true);
-            // If pwjType was already set by Procurement, now send vendor email
+            // pwjIssued must be manually set by Procurement/Admin — not auto-set here
             if (entry.getPwjType() != null && !entry.getPwjType().isBlank()) {
                 sendVendorEmail(entry);
             }
