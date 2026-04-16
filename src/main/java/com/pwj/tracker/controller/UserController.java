@@ -44,6 +44,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok("Phone updated", userService.updatePhone(id, body.get("phone"))));
     }
 
+    /** PATCH /api/v1/users/{id}/password — Admin: change user password */
+    @PatchMapping("/{id}/password")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> changePassword(
+            @PathVariable Long id, @Valid @RequestBody UserDto.ChangePasswordRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Password updated", userService.changePassword(id, req.getNewPassword())));
+    }
+
     /** DELETE /api/v1/users/{id} — Admin: deactivate user */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable Long id) {

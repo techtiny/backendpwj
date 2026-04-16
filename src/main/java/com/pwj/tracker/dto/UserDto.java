@@ -33,6 +33,12 @@ public class UserDto {
         @NotNull  public AppUser.Role role;
     }
 
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class ChangePasswordRequest {
+        @NotBlank(message = "New password is required")
+        public String newPassword;
+    }
+
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class UserResponse {
         public Long id;

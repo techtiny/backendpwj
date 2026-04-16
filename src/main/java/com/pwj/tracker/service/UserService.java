@@ -83,6 +83,15 @@ public class UserService {
         return toResponse(userRepository.save(user));
     }
 
+    // ── Change password (Admin only) ──
+    @Transactional
+    public UserDto.UserResponse changePassword(Long id, String newPassword) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setPassword(newPassword);
+        return toResponse(userRepository.save(user));
+    }
+
     // ── Deactivate user ──
     @Transactional
     public void deactivateUser(Long id) {
