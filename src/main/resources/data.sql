@@ -79,6 +79,7 @@ INSERT INTO app_user (username, password, full_name, email, role, active, create
 INSERT INTO app_user (username, password, full_name, email, role, active, created_at, updated_at) VALUES ('jagan', 'eng123', 'Jagan K', 'jagan@pwj.com', 'ENGINEER', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 INSERT INTO app_user (username, password, full_name, email, role, active, created_at, updated_at) VALUES ('santhosh', 'eng123', 'Santhosh Kumar', 'santhosh@pwj.com', 'ENGINEER', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 INSERT INTO app_user (username, password, full_name, email, role, active, created_at, updated_at) VALUES ('bhaskaran', 'eng123', 'Bhaskaran A', 'bhaskaran@pwj.com', 'ENGINEER', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO app_user (username, password, full_name, email, role, active, created_at, updated_at) VALUES ('anusha', 'anu', 'Anusha', 'anusha@happizo.com', 'ENGINEER', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ============================================
 -- VENDORS
