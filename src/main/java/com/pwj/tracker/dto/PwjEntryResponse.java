@@ -39,6 +39,7 @@ public class PwjEntryResponse {
     private String remarks;
     private Boolean vendorAcknowledged;
     private LocalDateTime vendorAcknowledgedAt;
+    private Boolean vendorEmailEnabled;
     private String deliveryDocUrl;
     private String approvalComment;
     private String approvedBy;

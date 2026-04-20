@@ -127,4 +127,23 @@ public class PwjEntryController {
     public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingDocApprovals() {
         return ResponseEntity.ok(ApiResponse.ok("Pending document approvals", service.getPendingDocApprovals()));
     }
+
+    /** PATCH /api/v1/pwj/entries/{id}/toggle-vendor-email — VP/Admin: toggle vendor email on/off */
+    @PatchMapping("/entries/{id}/toggle-vendor-email")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> toggleVendorEmail(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Vendor email toggled", service.toggleVendorEmail(id)));
+    }
+
+    /** POST /api/v1/pwj/entries/{id}/send-vendor-doc — Procurement: generate PDF from HTML and email to vendor */
+    @PostMapping("/entries/{id}/send-vendor-doc")
+    public ResponseEntity<ApiResponse<Void>> sendVendorDoc(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        try {
+            service.sendVendorDoc(id, body.get("htmlContent"));
+            return ResponseEntity.ok(ApiResponse.ok("Document sent to vendor", null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
 }

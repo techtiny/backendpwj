@@ -1,6 +1,7 @@
 package com.pwj.tracker.controller;
 
 import com.pwj.tracker.dto.ApiResponse;
+import com.pwj.tracker.service.BackupService;
 import com.pwj.tracker.service.ExcelExportService;
 import com.pwj.tracker.service.WeeklyReportService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class ReportController {
 
     private final WeeklyReportService weeklyReportService;
     private final ExcelExportService excelExportService;
+    private final BackupService backupService;
 
     /**
      * POST /api/v1/report/send-now
@@ -27,6 +29,16 @@ public class ReportController {
     public ResponseEntity<ApiResponse<String>> sendNow() {
         weeklyReportService.sendWeeklyReport();
         return ResponseEntity.ok(ApiResponse.ok("Report email triggered", "Check inbox at configured recipient"));
+    }
+
+    /**
+     * POST /api/v1/report/trigger-backup
+     * Manually trigger the full system backup (Excel + DB dump) email
+     */
+    @PostMapping("/trigger-backup")
+    public ResponseEntity<ApiResponse<String>> triggerBackup() {
+        backupService.triggerBackup();
+        return ResponseEntity.ok(ApiResponse.ok("Backup triggered", "Excel + DB dump will be emailed shortly"));
     }
 
     /**

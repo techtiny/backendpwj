@@ -37,6 +37,20 @@ public class UserController {
                 .body(ApiResponse.ok("User created", userService.createUser(req)));
     }
 
+    /** PATCH /api/v1/users/{id}/name — Admin: update user full name */
+    @PatchMapping("/{id}/name")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> updateFullName(
+            @PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Name updated", userService.updateFullName(id, body.get("fullName"))));
+    }
+
+    /** PATCH /api/v1/users/{id}/username — Admin: update username */
+    @PatchMapping("/{id}/username")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> updateUsername(
+            @PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Username updated", userService.updateUsername(id, body.get("username"))));
+    }
+
     /** PATCH /api/v1/users/{id}/phone — Admin: update user phone */
     @PatchMapping("/{id}/phone")
     public ResponseEntity<ApiResponse<UserDto.UserResponse>> updatePhone(

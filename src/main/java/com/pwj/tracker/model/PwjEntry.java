@@ -125,6 +125,10 @@ public class PwjEntry {
     @Column(name = "ack")
     private Boolean ack = false;
 
+    @Builder.Default
+    @Column(name = "vendor_email_enabled")
+    private Boolean vendorEmailEnabled = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

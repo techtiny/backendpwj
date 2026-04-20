@@ -74,6 +74,27 @@ public class UserService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    // ── Update username ──
+    @Transactional
+    public UserDto.UserResponse updateUsername(Long id, String username) {
+        if (username == null || username.isBlank()) throw new RuntimeException("Username cannot be empty");
+        if (userRepository.existsByUsername(username.trim())) throw new RuntimeException("Username '" + username.trim() + "' already exists");
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setUsername(username.trim());
+        return toResponse(userRepository.save(user));
+    }
+
+    // ── Update full name ──
+    @Transactional
+    public UserDto.UserResponse updateFullName(Long id, String fullName) {
+        if (fullName == null || fullName.isBlank()) throw new RuntimeException("Full name cannot be empty");
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setFullName(fullName.trim());
+        return toResponse(userRepository.save(user));
+    }
+
     // ── Update phone ──
     @Transactional
     public UserDto.UserResponse updatePhone(Long id, String phone) {

@@ -81,6 +81,19 @@
             <version>5.2.5</version>
         </dependency>
 
+        <!-- OpenHTMLtoPDF - server-side HTML → PDF -->
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+            <version>1.0.10</version>
+        </dependency>
+        <!-- Jsoup - convert HTML5 to XHTML for openhtmltopdf -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.17.2</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
