@@ -68,7 +68,7 @@ public class PwjEntry {
     private String vendor;
 
     @Builder.Default
-    @Column(name = "pwj_issued")
+    @Column(name = "pwj_issued", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private Boolean pwjIssued = false;
 
     @Enumerated(EnumType.STRING)
@@ -86,7 +86,7 @@ public class PwjEntry {
     private String pwjType;   // "PO", "WO", "JO"
 
     @Builder.Default
-    @Column(name = "vendor_acknowledged")
+    @Column(name = "vendor_acknowledged", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private Boolean vendorAcknowledged = false;
 
     @Column(name = "vendor_acknowledged_at")
@@ -122,11 +122,11 @@ public class PwjEntry {
     private String dependency;
 
     @Builder.Default
-    @Column(name = "ack")
+    @Column(name = "ack", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private Boolean ack = false;
 
     @Builder.Default
-    @Column(name = "vendor_email_enabled")
+    @Column(name = "vendor_email_enabled", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private Boolean vendorEmailEnabled = false;
 
     @CreationTimestamp
