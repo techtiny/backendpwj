@@ -131,7 +131,8 @@ public class PwjEntryService {
         entry.setDateOfRequirement(req.getDateOfRequirement());
         entry.setApprovalStatus(req.getApprovalStatus());
         entry.setVendor(req.getVendor());
-        entry.setPwjIssued(req.getPwjIssued());
+        // Only overwrite pwjIssued if explicitly provided — never let a null wipe it
+        if (req.getPwjIssued() != null) entry.setPwjIssued(req.getPwjIssued());
         entry.setPwjType(req.getPwjType());
         entry.setDeliveredDate(req.getDeliveredDate());
         if (req.getDeliveredDate() != null) {
