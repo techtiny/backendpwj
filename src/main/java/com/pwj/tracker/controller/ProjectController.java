@@ -119,6 +119,14 @@ public class ProjectController {
         return ApiResponse.ok("Project deactivated", null);
     }
 
+    /** DELETE /api/v1/projects/{id}/permanent — Admin/VP: permanently delete a project */
+    @DeleteMapping("/{id}/permanent")
+    public ApiResponse<Void> permanentDelete(@PathVariable Long id) {
+        if (!projectRepository.existsById(id)) throw new RuntimeException("Project not found: " + id);
+        projectRepository.deleteById(id);
+        return ApiResponse.ok("Project permanently deleted", null);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
     private BigDecimal computeTotal(BigDecimal value, Integer gstPct) {
         if (value == null) return null;

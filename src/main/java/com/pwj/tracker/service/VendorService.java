@@ -324,4 +324,9 @@ public class VendorService {
             throw new RuntimeException("Could not parse extracted vendor data from document");
         }
     }
+
+    public void deleteVendor(Long id) {
+        if (!vendorRepository.existsById(id)) throw new RuntimeException("Vendor not found: " + id);
+        vendorRepository.deleteById(id);
+    }
 }

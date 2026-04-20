@@ -71,6 +71,13 @@ public class VendorController {
         return ResponseEntity.ok(ApiResponse.ok("Vendor updated", updated));
     }
 
+    /** DELETE /api/v1/vendors/{id} — Admin / VP: permanently delete a vendor */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteVendor(@PathVariable Long id) {
+        vendorService.deleteVendor(id);
+        return ResponseEntity.ok(ApiResponse.ok("Vendor deleted", null));
+    }
+
     /** GET /api/v1/vendors/by-name?name=... — fetch vendor details by name for document generation */
     @GetMapping("/by-name")
     public ResponseEntity<ApiResponse<Vendor>> getVendorByName(@RequestParam String name) {
