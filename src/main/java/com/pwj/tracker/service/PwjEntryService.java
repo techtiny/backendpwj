@@ -184,17 +184,14 @@ public class PwjEntryService {
         }
 
         // Vendor Acknowledged: trigger engineer notification when flipped to true
+        // Note: pwjIssued is NOT auto-set here — Procurement must tick it manually
         if (Boolean.TRUE.equals(req.getVendorAcknowledged())
                 && !Boolean.TRUE.equals(entry.getVendorAcknowledged())) {
             entry.setVendorAcknowledged(true);
             entry.setVendorAcknowledgedAt(LocalDateTime.now());
-            entry.setPwjIssued(true);   // auto-mark PWJ as issued
             sendEngineerNotification(entry);
         } else if (req.getVendorAcknowledged() != null) {
             entry.setVendorAcknowledged(req.getVendorAcknowledged());
-            if (Boolean.FALSE.equals(req.getVendorAcknowledged())) {
-                entry.setPwjIssued(false);  // auto-unmark PWJ when vendor unacknowledged
-            }
         }
 
         return toResponse(repository.save(entry));
