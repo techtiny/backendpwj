@@ -1,0 +1,9 @@
+target/
+uploads/
+*.class
+*.jar
+*.war
+.DS_Store
+.vscode/
+*.iml
+.idea/
