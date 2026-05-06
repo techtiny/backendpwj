@@ -52,7 +52,7 @@ public class WeeklyReportService {
         helper.setSubject("PWJ Weekly Report — " + date);
         helper.setText(
             "<html><body style='font-family:sans-serif'>" +
-            "<h2 style='color:#0f4c81'>PWJ Tracker — Weekly Report</h2>" +
+            "<h2 style='color:#0f4c81'>Procurement Tracker — Weekly Report</h2>" +
             "<p>Hi Team,</p>" +
             "<p>Please find attached the weekly Purchase Work Journal report for <b>" + date + "</b>.</p>" +
             "<p>The report includes all entries with their current approval and procurement status.</p>" +

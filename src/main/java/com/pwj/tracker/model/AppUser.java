@@ -52,6 +52,6 @@ public class AppUser {
     private LocalDateTime updatedAt;
 
     public enum Role {
-        ADMIN, ENGINEER, PROCUREMENT, VP, OH
+        ADMIN, ENGINEER, PROCUREMENT, VP, OH, CEO
     }
 }

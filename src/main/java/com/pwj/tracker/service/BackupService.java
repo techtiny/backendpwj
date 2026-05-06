@@ -140,10 +140,10 @@ public class BackupService {
 
         helper.setFrom(mailFrom != null ? mailFrom : "noreply@happizo.com");
         helper.setTo((backupTo != null ? backupTo : "admin@happizo.com").split(","));
-        helper.setSubject("PWJ Tracker — Weekly Backup " + date);
+        helper.setSubject("Procurement Tracker — Weekly Backup " + date);
         helper.setText(
             "<html><body style='font-family:sans-serif;color:#0f172a'>" +
-            "<h2 style='color:#0f4c81'>PWJ Tracker — Weekly System Backup</h2>" +
+            "<h2 style='color:#0f4c81'>Procurement Tracker — Weekly System Backup</h2>" +
             "<p>Hi Admin,</p>" +
             "<p>Please find attached the automated weekly backup for <b>" + date + "</b>.</p>" +
             "<ul>" +
@@ -151,7 +151,7 @@ public class BackupService {
             "  <li><b>PWJ-DB-Backup-" + dateSuffix + ".sql</b> — MySQL database dump</li>" +
             "</ul>" +
             "<p>Store these files securely. This backup is generated every <b>Saturday at 9:00 PM</b>.</p>" +
-            "<br/><p style='color:#64748b;font-size:12px'>This is an automated email from PWJ Tracker.</p>" +
+            "<br/><p style='color:#64748b;font-size:12px'>This is an automated email from Procurement Tracker.</p>" +
             "</body></html>",
             true
         );

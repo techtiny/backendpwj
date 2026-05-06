@@ -1,9 +1,5 @@
 target/
-uploads/
-*.class
-*.jar
-*.war
 .DS_Store
-.vscode/
-*.iml
-.idea/
+*.log
+src/.DS_Store
+src/main/.DS_Store

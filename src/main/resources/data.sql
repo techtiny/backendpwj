@@ -1,5 +1,5 @@
 -- ============================================
--- PWJ Tracker - Seed Data (H2 Compatible)
+-- Procurement Tracker - Seed Data (H2 Compatible)
 -- ============================================
 
 INSERT INTO pwj_entry (timestamp, raised_by, project_name, boq_no, material_required, specification, brand, unit, quantity, date_of_requirement, approval_status, vendor, pwj_issued, status, delivered_date, remarks, created_at, updated_at) VALUES ('2026-01-19 18:38:00','Sakthiganesh','Niwin','001','Granite','Lakshmi red Natural','Shri kota stones','Nos',5,'2026-01-23','PROCEED','Shri kota stones',true,'CLOSED','2026-01-23','Material delivered at site',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);

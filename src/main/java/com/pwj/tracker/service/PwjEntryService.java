@@ -328,7 +328,7 @@ public class PwjEntryService {
                         {"Quantity",       entry.getQuantity() != null ? String.valueOf(entry.getQuantity()) : "—"},
                         {"Required By",    entry.getDateOfRequirement() != null ? entry.getDateOfRequirement().toString() : "—"},
                     },
-                    "Please log in to PWJ Tracker to review and approve this request.", "#1a6ab1");
+                    "Please log in to Procurement Tracker to review and approve this request.", "#1a6ab1");
             for (String to : recipients) {
                 sendEmail(to.trim(), subject, body);
             }
@@ -415,7 +415,7 @@ public class PwjEntryService {
                         {"Delivery Status",  entry.getStatus() == PwjEntry.EntryStatus.CLOSED ? "Delivered" : "Pending"},
                         {"Delivered Date",   entry.getDeliveredDate() != null ? entry.getDeliveredDate().toString() : "—"},
                     },
-                    "Please log in to PWJ Tracker to review the uploaded documents.", "#7c3aed");
+                    "Please log in to Procurement Tracker to review the uploaded documents.", "#7c3aed");
             for (String email : emails) {
                 sendEmail(email, subject, body);
             }
@@ -503,7 +503,7 @@ public class PwjEntryService {
           .append("<table width='100%' cellpadding='0' cellspacing='0'><tr>")
           .append("<td><img src='https://happizo.com/assets/myimages/logo.png' alt='Happizo' width='80' style='display:block;max-width:80px;height:auto;'/></td>")
           .append("<td align='right' style='vertical-align:middle;'>")
-          .append("<div style='font-size:11px;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;'>PWJ Tracker</div>")
+          .append("<div style='font-size:11px;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;'>Procurement Tracker</div>")
           .append("<div style='font-size:10px;color:#b0bec5;margin-top:2px;'>Purchase Work Journal System</div>")
           .append("</td></tr></table>")
           .append("</td></tr>")
@@ -556,7 +556,7 @@ public class PwjEntryService {
           // ── Bottom disclaimer ──
           .append("<tr><td style='background:#f8fafc;padding:14px 36px;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;'>")
           .append("<div style='font-size:10.5px;color:#94a3b8;line-height:1.6;'>")
-          .append("This is an automated notification from <strong style='color:#64748b;'>PWJ Tracker</strong>. Please do not reply to this email.")
+          .append("This is an automated notification from <strong style='color:#64748b;'>Procurement Tracker</strong>. Please do not reply to this email.")
           .append("</div>")
           .append("</td></tr>")
 

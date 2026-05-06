@@ -50,7 +50,7 @@ public class ExcelExportService {
             Row titleRow = sheet.createRow(0);
             titleRow.setHeightInPoints(28);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("PWJ Tracker — Weekly Report (" + LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy")) + ")");
+            titleCell.setCellValue("Procurement Tracker — Weekly Report (" + LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy")) + ")");
             titleCell.setCellStyle(titleStyle);
             sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, HEADERS.length - 1));
 
