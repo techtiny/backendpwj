@@ -70,6 +70,18 @@ public class ProjectController {
                 .clientAddress(req.getClientAddress())
                 .billingAddress(req.getBillingAddress())
                 .projectValue(req.getProjectValue())
+                .quoteValue(req.getQuoteValue())
+                .quoteGstPct(req.getQuoteGstPct())
+                .quoteDocUrl(req.getQuoteDocUrl())
+                .quoteTotalValue(computeTotal(req.getQuoteValue(), req.getQuoteGstPct()))
+                .additionalWoValue(req.getAdditionalWoValue())
+                .additionalWoGstPct(req.getAdditionalWoGstPct())
+                .additionalWoTotal(computeTotal(req.getAdditionalWoValue(), req.getAdditionalWoGstPct()))
+                .additionalWoDocUrl(req.getAdditionalWoDocUrl())
+                .additionalQuoteValue(req.getAdditionalQuoteValue())
+                .additionalQuoteGstPct(req.getAdditionalQuoteGstPct())
+                .additionalQuoteTotal(computeTotal(req.getAdditionalQuoteValue(), req.getAdditionalQuoteGstPct()))
+                .additionalQuoteDocUrl(req.getAdditionalQuoteDocUrl())
                 .gstPct(req.getGstPct())
                 .totalValue(computeTotal(req.getProjectValue(), req.getGstPct()))
                 .poWoStatus(req.getPoWoStatus())
@@ -95,6 +107,28 @@ public class ProjectController {
         if (req.getClientAddress()    != null) project.setClientAddress(req.getClientAddress());
         if (req.getBillingAddress()   != null) project.setBillingAddress(req.getBillingAddress());
         if (req.getProjectValue()     != null) project.setProjectValue(req.getProjectValue());
+        if (req.getQuoteValue()        != null) project.setQuoteValue(req.getQuoteValue());
+        if (req.getQuoteGstPct()          != null) project.setQuoteGstPct(req.getQuoteGstPct());
+        if (req.getQuoteDocUrl()          != null) project.setQuoteDocUrl(req.getQuoteDocUrl());
+        if (req.getAdditionalWoValue()       != null) project.setAdditionalWoValue(req.getAdditionalWoValue());
+        if (req.getAdditionalWoGstPct()      != null) project.setAdditionalWoGstPct(req.getAdditionalWoGstPct());
+        if (req.getAdditionalWoDocUrl()      != null) project.setAdditionalWoDocUrl(req.getAdditionalWoDocUrl());
+        if (req.getAdditionalWoValue() != null || req.getAdditionalWoGstPct() != null) {
+            BigDecimal av = req.getAdditionalWoValue()   != null ? req.getAdditionalWoValue()   : project.getAdditionalWoValue();
+            Integer    ag = req.getAdditionalWoGstPct()  != null ? req.getAdditionalWoGstPct()  : project.getAdditionalWoGstPct();
+            if (av != null) project.setAdditionalWoTotal(computeTotal(av, ag));
+        }
+        if (req.getAdditionalQuoteValue()    != null) project.setAdditionalQuoteValue(req.getAdditionalQuoteValue());
+        if (req.getAdditionalQuoteGstPct()   != null) project.setAdditionalQuoteGstPct(req.getAdditionalQuoteGstPct());
+        if (req.getAdditionalQuoteDocUrl()   != null) project.setAdditionalQuoteDocUrl(req.getAdditionalQuoteDocUrl());
+        if (req.getAdditionalQuoteValue() != null || req.getAdditionalQuoteGstPct() != null) {
+            BigDecimal aqv = req.getAdditionalQuoteValue()  != null ? req.getAdditionalQuoteValue()  : project.getAdditionalQuoteValue();
+            Integer    aqg = req.getAdditionalQuoteGstPct() != null ? req.getAdditionalQuoteGstPct() : project.getAdditionalQuoteGstPct();
+            if (aqv != null) project.setAdditionalQuoteTotal(computeTotal(aqv, aqg));
+        }
+        BigDecimal qv = req.getQuoteValue() != null ? req.getQuoteValue() : project.getQuoteValue();
+        Integer qg    = req.getQuoteGstPct() != null ? req.getQuoteGstPct() : project.getQuoteGstPct();
+        if (qv != null) project.setQuoteTotalValue(computeTotal(qv, qg));
         if (req.getGstPct()           != null) project.setGstPct(req.getGstPct());
         if (req.getProjectValue() != null || req.getGstPct() != null) {
             BigDecimal val = req.getProjectValue() != null ? req.getProjectValue() : project.getProjectValue();

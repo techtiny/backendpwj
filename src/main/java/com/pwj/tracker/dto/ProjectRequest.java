@@ -19,6 +19,15 @@ public class ProjectRequest {
 
     // Financial
     private BigDecimal projectValue;
+    private BigDecimal quoteValue;
+    private Integer quoteGstPct;
+    private String quoteDocUrl;
+    private BigDecimal additionalWoValue;
+    private Integer additionalWoGstPct;
+    private String additionalWoDocUrl;
+    private BigDecimal additionalQuoteValue;
+    private Integer additionalQuoteGstPct;
+    private String additionalQuoteDocUrl;
     private Integer gstPct;
 
     // PO/WO

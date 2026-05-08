@@ -46,6 +46,42 @@ public class Project {
     @Column(name = "project_value", precision = 15, scale = 2)
     private BigDecimal projectValue;
 
+    @Column(name = "quote_value", precision = 15, scale = 2)
+    private BigDecimal quoteValue;
+
+    @Column(name = "quote_gst_pct")
+    private Integer quoteGstPct;
+
+    @Column(name = "quote_doc_url", length = 500)
+    private String quoteDocUrl;
+
+    @Column(name = "quote_total_value", precision = 15, scale = 2)
+    private BigDecimal quoteTotalValue;
+
+    @Column(name = "additional_wo_value", precision = 15, scale = 2)
+    private BigDecimal additionalWoValue;
+
+    @Column(name = "additional_wo_gst_pct")
+    private Integer additionalWoGstPct;
+
+    @Column(name = "additional_wo_total", precision = 15, scale = 2)
+    private BigDecimal additionalWoTotal;
+
+    @Column(name = "additional_wo_doc_url", length = 500)
+    private String additionalWoDocUrl;
+
+    @Column(name = "additional_quote_value", precision = 15, scale = 2)
+    private BigDecimal additionalQuoteValue;
+
+    @Column(name = "additional_quote_gst_pct")
+    private Integer additionalQuoteGstPct;
+
+    @Column(name = "additional_quote_total", precision = 15, scale = 2)
+    private BigDecimal additionalQuoteTotal;
+
+    @Column(name = "additional_quote_doc_url", length = 500)
+    private String additionalQuoteDocUrl;
+
     @Column(name = "gst_pct")
     private Integer gstPct;
 
