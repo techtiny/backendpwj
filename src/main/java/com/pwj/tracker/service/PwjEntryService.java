@@ -101,7 +101,7 @@ public class PwjEntryService {
                 .dateOfRequirement(req.getDateOfRequirement())
                 .imageReference(req.getImageReference())
                 .approvalStatus(PwjEntry.ApprovalStatus.HOLD)
-                .vendor(req.getVendor())
+                .vendor(req.getVendor() != null && !req.getVendor().isBlank() ? req.getVendor() : null)
                 .pwjIssued(false)
                 .ack(false)
                 .vendorAcknowledged(false)
@@ -154,7 +154,10 @@ public class PwjEntryService {
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
 
         if (req.getVendor()      != null) {
-            boolean vendorBeingAssigned = entry.getVendor() == null && !req.getVendor().isBlank();
+            boolean vendorBeingAssigned = (entry.getVendor() == null || entry.getVendor().isBlank()) && !req.getVendor().isBlank();
+            if (vendorBeingAssigned && entry.getApprovalStatus() != PwjEntry.ApprovalStatus.PROCEED) {
+                throw new RuntimeException("Vendor cannot be assigned before OH approves this entry");
+            }
             entry.setVendor(req.getVendor());
             if (vendorBeingAssigned) entry.setDependency("VP Approval");
         }
