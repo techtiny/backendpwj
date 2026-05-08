@@ -154,10 +154,10 @@ public class PwjEntryService {
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
 
         if (req.getVendor()      != null) {
-            boolean vendorBeingAssigned = (entry.getVendor() == null || entry.getVendor().isBlank()) && !req.getVendor().isBlank();
-            if (vendorBeingAssigned && entry.getApprovalStatus() != PwjEntry.ApprovalStatus.PROCEED) {
+            if (!req.getVendor().isBlank() && entry.getApprovalStatus() != PwjEntry.ApprovalStatus.PROCEED) {
                 throw new RuntimeException("Vendor cannot be assigned before OH approves this entry");
             }
+            boolean vendorBeingAssigned = (entry.getVendor() == null || entry.getVendor().isBlank()) && !req.getVendor().isBlank();
             entry.setVendor(req.getVendor());
             if (vendorBeingAssigned) entry.setDependency("VP Approval");
         }
