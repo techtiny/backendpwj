@@ -4,6 +4,7 @@ import com.pwj.tracker.model.PwjEntry;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -47,4 +48,8 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
     );
 
     List<PwjEntry> findByDocStatus(PwjEntry.DocStatus docStatus);
+
+    @Modifying
+    @Query("UPDATE PwjEntry e SET e.dependency = 'OH Approval' WHERE e.dependency IS NULL OR e.dependency = ''")
+    int backfillNullDependency();
 }
