@@ -182,7 +182,8 @@ public class PwjEntryService {
             boolean isNewPwjType = !req.getPwjType().equals(entry.getPwjType());
             entry.setPwjType(req.getPwjType());
             if (isNewPwjType && PwjEntry.ApprovalStatus.PROCEED.equals(entry.getApprovalStatus())) {
-                sendVendorEmail(entry);
+                PwjEntry snapshot = entry;
+                CompletableFuture.runAsync(() -> sendVendorEmail(snapshot));
             }
         }
 
@@ -192,7 +193,8 @@ public class PwjEntryService {
                 && !Boolean.TRUE.equals(entry.getVendorAcknowledged())) {
             entry.setVendorAcknowledged(true);
             entry.setVendorAcknowledgedAt(LocalDateTime.now());
-            sendEngineerNotification(entry);
+            PwjEntry snap = entry;
+            CompletableFuture.runAsync(() -> sendEngineerNotification(snap));
         } else if (req.getVendorAcknowledged() != null) {
             entry.setVendorAcknowledged(req.getVendorAcknowledged());
         }
@@ -212,7 +214,9 @@ public class PwjEntryService {
         }
         if (req.getDeliveryDocUrl() != null && !req.getDeliveryDocUrl().isBlank()) {
             entry.setDeliveryDocUrl(req.getDeliveryDocUrl());
-            sendProcurementNotification(entry, req.getUpdatedBy());
+            PwjEntry snap = entry;
+            String updatedBy = req.getUpdatedBy();
+            CompletableFuture.runAsync(() -> sendProcurementNotification(snap, updatedBy));
         }
         return toResponse(repository.save(entry));
     }
