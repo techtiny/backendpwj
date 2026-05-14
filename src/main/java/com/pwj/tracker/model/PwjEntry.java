@@ -121,6 +121,14 @@ public class PwjEntry {
     @Column(name = "dependency", length = 300)
     private String dependency;
 
+    @PrePersist
+    @PreUpdate
+    void ensureDependency() {
+        if (dependency == null || dependency.isBlank()) {
+            dependency = "OH Approval";
+        }
+    }
+
     @Builder.Default
     @Column(name = "ack", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private Boolean ack = false;
