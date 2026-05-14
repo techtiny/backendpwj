@@ -14,6 +14,7 @@ import org.jsoup.nodes.Document;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.util.ByteArrayDataSource;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +48,20 @@ public class PwjEntryService {
 
     @Value("${pwj.newentry.email.to}")
     private String newEntryEmailTo;
+
+    // ── One-time migration: backfill null dependency on startup ──────────
+    @PostConstruct
+    @Transactional
+    public void backfillMissingDependency() {
+        List<PwjEntry> nullDep = repository.findAll().stream()
+                .filter(e -> e.getDependency() == null || e.getDependency().isBlank())
+                .toList();
+        if (!nullDep.isEmpty()) {
+            nullDep.forEach(e -> e.setDependency("OH Approval"));
+            repository.saveAll(nullDep);
+            log.info("Backfilled dependency='OH Approval' for {} entries", nullDep.size());
+        }
+    }
 
     // ── Admin/Procurement: see all entries with filters ──────────────────
     public PagedResponse<PwjEntryResponse> getAll(
@@ -143,7 +158,7 @@ public class PwjEntryService {
         entry.setRemarks(req.getRemarks());
         if (req.getDocData() != null) entry.setDocData(req.getDocData());
         if (req.getDocNumber() != null && !req.getDocNumber().isBlank()) entry.setDocNumber(req.getDocNumber());
-        entry.setDependency(req.getDependency());
+        if (req.getDependency() != null && !req.getDependency().isBlank()) entry.setDependency(req.getDependency());
         return toResponse(repository.save(entry));
     }
 
