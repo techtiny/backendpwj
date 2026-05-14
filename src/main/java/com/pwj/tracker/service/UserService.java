@@ -35,8 +35,17 @@ public class UserService {
             throw new RuntimeException("Invalid username or password");
         }
 
+        // Block second login if an active session exists (within last 8 hours)
+        if (!req.isForce()
+                && user.getSessionToken() != null
+                && user.getSessionCreatedAt() != null
+                && user.getSessionCreatedAt().isAfter(java.time.LocalDateTime.now().minusHours(8))) {
+            throw new RuntimeException("ALREADY_LOGGED_IN");
+        }
+
         String token = UUID.randomUUID().toString();
         user.setSessionToken(token);
+        user.setSessionCreatedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
 
         return UserDto.LoginResponse.builder()
@@ -59,6 +68,7 @@ public class UserService {
     public void logout(String token) {
         userRepository.findBySessionToken(token).ifPresent(user -> {
             user.setSessionToken(null);
+            user.setSessionCreatedAt(null);
             userRepository.save(user);
         });
     }

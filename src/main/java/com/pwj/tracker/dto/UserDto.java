@@ -12,6 +12,7 @@ public class UserDto {
     public static class LoginRequest {
         @NotBlank public String username;
         @NotBlank public String password;
+        public boolean force; // true = kick out existing session
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

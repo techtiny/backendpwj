@@ -46,6 +46,9 @@ public class AppUser {
     @Column(name = "session_token", length = 64)
     private String sessionToken;
 
+    @Column(name = "session_created_at")
+    private LocalDateTime sessionCreatedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
