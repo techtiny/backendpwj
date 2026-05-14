@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["maven", "jdk17", "freetype", "fontconfig"]
+nixPkgs = ["freetype", "fontconfig"]
