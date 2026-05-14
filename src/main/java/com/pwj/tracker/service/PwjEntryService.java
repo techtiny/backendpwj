@@ -268,16 +268,7 @@ public class PwjEntryService {
             int year  = today.getYear();
             int fyStart = month >= 4 ? year : year - 1;
             String fy = String.format("%02d%02d", fyStart % 100, (fyStart + 1) % 100);
-            String proj = entry.getProjectName() == null ? "" :
-                java.util.Arrays.stream(entry.getProjectName().trim().split("\\s+"))
-                    .filter(w -> !w.isEmpty())
-                    .map(w -> String.valueOf(w.charAt(0)).toUpperCase())
-                    .collect(java.util.stream.Collectors.joining())
-                    .substring(0, Math.min(5,
-                        (int) java.util.Arrays.stream(entry.getProjectName().trim().split("\\s+"))
-                            .filter(w -> !w.isEmpty()).count()));
-            String middle = proj.isEmpty() ? fy : proj + "-" + fy;
-            entry.setDocNumber(entry.getPwjType() + "-" + middle + "-" + String.format("%04d", id));
+            entry.setDocNumber(entry.getPwjType() + "-" + fy + "-" + String.format("%04d", id));
         }
         entry.setDocStatus(PwjEntry.DocStatus.PENDING_VP_APPROVAL);
         entry.setDependency("VP Approval");
