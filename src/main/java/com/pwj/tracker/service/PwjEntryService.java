@@ -227,11 +227,7 @@ public class PwjEntryService {
         entry.setApprovedBy(req.getApprovedBy());
         entry.setApprovedAt(LocalDateTime.now());
         if (req.getApprovalStatus() == PwjEntry.ApprovalStatus.PROCEED) {
-            // pwjIssued must be manually set by Procurement/Admin — not auto-set here
             entry.setDependency("Procurement");
-            if (entry.getPwjType() != null && !entry.getPwjType().isBlank()) {
-                sendVendorEmail(entry);
-            }
         }
         return toResponse(repository.save(entry));
     }
