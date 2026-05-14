@@ -26,22 +26,41 @@ public class UserService {
     private final VendorService vendorService;
 
     // ── Login (simple password check - no JWT for simplicity) ──
+    @Transactional
     public UserDto.LoginResponse login(UserDto.LoginRequest req) {
         AppUser user = userRepository.findByUsernameAndActiveTrue(req.getUsername())
                 .orElseThrow(() -> new RuntimeException("Invalid username or password"));
 
-        // Plain text password check (use BCrypt in production)
         if (!user.getPassword().equals(req.getPassword())) {
             throw new RuntimeException("Invalid username or password");
         }
+
+        String token = UUID.randomUUID().toString();
+        user.setSessionToken(token);
+        userRepository.save(user);
 
         return UserDto.LoginResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .role(user.getRole())
-                .token(UUID.randomUUID().toString()) // simple token
+                .token(token)
                 .build();
+    }
+
+    // ── Validate session token ──
+    public boolean validateToken(String token) {
+        if (token == null || token.isBlank()) return false;
+        return userRepository.findBySessionToken(token).isPresent();
+    }
+
+    // ── Logout — clear session token ──
+    @Transactional
+    public void logout(String token) {
+        userRepository.findBySessionToken(token).ifPresent(user -> {
+            user.setSessionToken(null);
+            userRepository.save(user);
+        });
     }
 
     // ── Create user (Admin only) ──

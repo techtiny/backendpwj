@@ -21,4 +21,22 @@ public class AuthController {
             @Valid @RequestBody UserDto.LoginRequest req) {
         return ResponseEntity.ok(ApiResponse.ok("Login successful", userService.login(req)));
     }
+
+    /** POST /api/v1/auth/logout */
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @RequestHeader(value = "X-Session-Token", required = false) String token) {
+        userService.logout(token);
+        return ResponseEntity.ok(ApiResponse.ok("Logged out", null));
+    }
+
+    /** GET /api/v1/auth/validate */
+    @GetMapping("/validate")
+    public ResponseEntity<ApiResponse<Void>> validate(
+            @RequestHeader(value = "X-Session-Token", required = false) String token) {
+        if (userService.validateToken(token)) {
+            return ResponseEntity.ok(ApiResponse.ok("Valid", null));
+        }
+        return ResponseEntity.status(401).body(ApiResponse.error("Session expired"));
+    }
 }

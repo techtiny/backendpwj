@@ -221,11 +221,14 @@ public class PwjEntryService {
         return toResponse(repository.save(entry));
     }
 
-    // ── Approval (Admin only) ─────────────────────────────────────────────
+    // ── Approval (OH/Admin) ───────────────────────────────────────────────
     @Transactional
     public PwjEntryResponse updateApproval(Long id, ApprovalRequest req) {
         PwjEntry entry = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (entry.getApprovalStatus() == PwjEntry.ApprovalStatus.PROCEED) {
+            throw new RuntimeException("This entry has already been approved and cannot be changed.");
+        }
         entry.setApprovalStatus(req.getApprovalStatus());
         entry.setApprovalComment(req.getComment());
         entry.setApprovedBy(req.getApprovedBy());

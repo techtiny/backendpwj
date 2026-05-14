@@ -10,6 +10,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findByUsernameAndActiveTrue(String username);
 
+    Optional<AppUser> findBySessionToken(String sessionToken);
+
     List<AppUser> findAllByActiveTrue();
 
     List<AppUser> findByRoleAndActiveTrue(AppUser.Role role);

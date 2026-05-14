@@ -43,6 +43,9 @@ public class AppUser {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
+    @Column(name = "session_token", length = 64)
+    private String sessionToken;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
