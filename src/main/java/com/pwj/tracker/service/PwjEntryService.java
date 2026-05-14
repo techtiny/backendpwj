@@ -263,8 +263,12 @@ public class PwjEntryService {
             throw new RuntimeException("Vendor and PWJ Type must be assigned before generating a document");
         }
         if (entry.getDocNumber() == null) {
-            String year = String.valueOf(java.time.LocalDate.now().getYear());
-            entry.setDocNumber(entry.getPwjType() + "-" + year + "-" + String.format("%04d", id));
+            java.time.LocalDate today = java.time.LocalDate.now();
+            int month = today.getMonthValue();
+            int year  = today.getYear();
+            int fyStart = month >= 4 ? year : year - 1;
+            String fy = String.format("%02d%02d", fyStart % 100, (fyStart + 1) % 100);
+            entry.setDocNumber(entry.getPwjType() + "-O-" + fy + "-" + String.format("%04d", id));
         }
         entry.setDocStatus(PwjEntry.DocStatus.PENDING_VP_APPROVAL);
         entry.setDependency("VP Approval");
