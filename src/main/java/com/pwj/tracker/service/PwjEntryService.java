@@ -128,6 +128,7 @@ public class PwjEntryService {
         entry.setUnit(req.getUnit());
         entry.setQuantity(req.getQuantity());
         entry.setDateOfRequirement(req.getDateOfRequirement());
+        if (req.getImageReference() != null) entry.setImageReference(req.getImageReference());
         entry.setApprovalStatus(req.getApprovalStatus());
         entry.setVendor(req.getVendor());
         // Only overwrite pwjIssued if explicitly provided — never let a null wipe it

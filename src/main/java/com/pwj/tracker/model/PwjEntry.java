@@ -57,7 +57,7 @@ public class PwjEntry {
     @Column(name = "date_of_requirement")
     private LocalDate dateOfRequirement;
 
-    @Column(name = "image_reference", length = 500)
+    @Column(name = "image_reference", columnDefinition = "TEXT")
     private String imageReference;
 
     @Enumerated(EnumType.STRING)
