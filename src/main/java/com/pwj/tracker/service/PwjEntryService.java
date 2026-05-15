@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -111,7 +110,7 @@ public class PwjEntryService {
                 .dependency("OH Approval")
                 .build();
         PwjEntryResponse saved = toResponse(repository.save(entry));
-        CompletableFuture.runAsync(() -> sendNewEntryNotification(saved));
+        // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendNewEntryNotification(saved));
         return saved;
     }
 
@@ -182,8 +181,7 @@ public class PwjEntryService {
             boolean isNewPwjType = !req.getPwjType().equals(entry.getPwjType());
             entry.setPwjType(req.getPwjType());
             if (isNewPwjType && PwjEntry.ApprovalStatus.PROCEED.equals(entry.getApprovalStatus())) {
-                PwjEntry snapshot = entry;
-                CompletableFuture.runAsync(() -> sendVendorEmail(snapshot));
+                // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendVendorEmail(snapshot));
             }
         }
 
@@ -193,8 +191,7 @@ public class PwjEntryService {
                 && !Boolean.TRUE.equals(entry.getVendorAcknowledged())) {
             entry.setVendorAcknowledged(true);
             entry.setVendorAcknowledgedAt(LocalDateTime.now());
-            PwjEntry snap = entry;
-            CompletableFuture.runAsync(() -> sendEngineerNotification(snap));
+            // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendEngineerNotification(entry));
         } else if (req.getVendorAcknowledged() != null) {
             entry.setVendorAcknowledged(req.getVendorAcknowledged());
         }
@@ -214,9 +211,7 @@ public class PwjEntryService {
         }
         if (req.getDeliveryDocUrl() != null && !req.getDeliveryDocUrl().isBlank()) {
             entry.setDeliveryDocUrl(req.getDeliveryDocUrl());
-            PwjEntry snap = entry;
-            String updatedBy = req.getUpdatedBy();
-            CompletableFuture.runAsync(() -> sendProcurementNotification(snap, updatedBy));
+            // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendProcurementNotification(entry, req.getUpdatedBy()));
         }
         return toResponse(repository.save(entry));
     }
@@ -471,8 +466,8 @@ public class PwjEntryService {
         helper.setSubject(subject);
         helper.setText(emailBody, true);
         helper.addAttachment(filename, new ByteArrayDataSource(pdfBytes, "application/pdf"));
-        mailSender.send(message);
-        log.info("Vendor doc email sent to {} (cc: anusha, bharath, sunil) for entry #{}", vendorEmail, id);
+        // EMAIL DISABLED: mailSender.send(message);
+        log.info("Vendor doc email DISABLED — skipped for entry #{}", id);
     }
 
     private byte[] generatePdfFromHtml(String html) throws IOException {
