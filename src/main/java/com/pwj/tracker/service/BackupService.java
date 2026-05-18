@@ -41,6 +41,8 @@ public class BackupService {
     @Value("${pwj.backup.email.to:admin@happizo.com}")
     private String backupTo;
 
+    public String getBackupTo() { return backupTo; }
+
     @Value("${spring.datasource.url:}")
     private String datasourceUrl;
 
@@ -53,24 +55,26 @@ public class BackupService {
     // Every Saturday at 21:00
     @Scheduled(cron = "0 0 21 * * SAT")
     public void sendWeeklyBackup() {
-        triggerBackup();
+        triggerBackupQuiet();
     }
 
-    /** Manual trigger — callable from the admin endpoint for testing */
-    public void triggerBackup() {
+    /** Manual trigger — throws on failure so the caller can surface the error */
+    public void triggerBackup() throws Exception {
         log.info("Starting weekly backup — {}", LocalDateTime.now());
-        try {
-            byte[] excelBytes = excelExportService.generateWeeklyReport();
-            log.info("Excel backup generated: {} bytes", excelBytes.length);
+        byte[] excelBytes = excelExportService.generateWeeklyReport();
+        log.info("Excel backup generated: {} bytes", excelBytes.length);
 
-            byte[] dbBytes = generateDatabaseDump();
-            log.info("DB backup generated: {} bytes", dbBytes.length);
+        byte[] dbBytes = generateDatabaseDump();
+        log.info("DB backup generated: {} bytes", dbBytes.length);
 
-            sendBackupEmail(excelBytes, dbBytes);
-            log.info("Weekly backup sent to {}", backupTo);
-        } catch (Exception e) {
-            log.error("Weekly backup failed", e);
-        }
+        sendBackupEmail(excelBytes, dbBytes);
+        log.info("Weekly backup sent to {}", backupTo);
+    }
+
+    // Scheduled job — keeps silent failure so it doesn't crash the cron thread
+    private void triggerBackupQuiet() {
+        try { triggerBackup(); }
+        catch (Exception e) { log.error("Weekly backup failed", e); }
     }
 
     // ── MySQL dump via mysqldump ──────────────────────────────────────────────

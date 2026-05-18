@@ -37,8 +37,12 @@ public class ReportController {
      */
     @PostMapping("/trigger-backup")
     public ResponseEntity<ApiResponse<String>> triggerBackup() {
-        backupService.triggerBackup();
-        return ResponseEntity.ok(ApiResponse.ok("Backup triggered", "Excel + DB dump will be emailed shortly"));
+        try {
+            backupService.triggerBackup();
+            return ResponseEntity.ok(ApiResponse.ok("Backup sent", "Excel + DB dump emailed to " + backupService.getBackupTo()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponse.error("Backup failed: " + e.getMessage()));
+        }
     }
 
     /**
