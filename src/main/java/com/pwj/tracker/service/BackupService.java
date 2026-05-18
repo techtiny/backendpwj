@@ -11,21 +11,21 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import javax.sql.DataSource;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Sends a full system backup every Saturday at 9:00 PM to admin@happizo.com.
+ * Sends a full system backup every Saturday at 9:00 PM.
  * Attachments:
  *   1. PWJ-Backup-yyyy-MM-dd.xlsx  — all PWJ entries (Excel)
- *   2. PWJ-DB-Backup-yyyy-MM-dd.sql — MySQL database dump (mysqldump)
+ *   2. PWJ-DB-Backup-yyyy-MM-dd.sql — JDBC-generated SQL dump (no mysqldump binary needed)
  */
 @Slf4j
 @Service
@@ -34,6 +34,7 @@ public class BackupService {
 
     private final JavaMailSender     mailSender;
     private final ExcelExportService excelExportService;
+    private final DataSource         dataSource;
 
     @Value("${pwj.report.email.from}")
     private String mailFrom;
@@ -42,15 +43,6 @@ public class BackupService {
     private String backupTo;
 
     public String getBackupTo() { return backupTo; }
-
-    @Value("${spring.datasource.url:}")
-    private String datasourceUrl;
-
-    @Value("${spring.datasource.username:root}")
-    private String dbUsername;
-
-    @Value("${spring.datasource.password:}")
-    private String dbPassword;
 
     // Every Saturday at 21:00
     @Scheduled(cron = "0 0 21 * * SAT")
@@ -71,66 +63,88 @@ public class BackupService {
         log.info("Weekly backup sent to {}", backupTo);
     }
 
-    // Scheduled job — keeps silent failure so it doesn't crash the cron thread
     private void triggerBackupQuiet() {
         try { triggerBackup(); }
         catch (Exception e) { log.error("Weekly backup failed", e); }
     }
 
-    // ── MySQL dump via mysqldump ──────────────────────────────────────────────
+    // ── JDBC-based SQL dump (no mysqldump binary required) ───────────────────
 
     private byte[] generateDatabaseDump() throws Exception {
-        // Parse jdbc:mysql://HOST:PORT/DBNAME?...
-        String host   = "localhost";
-        int    port   = 3306;
-        String dbName = "pwj_tracker";
+        StringWriter sw = new StringWriter();
+        PrintWriter  pw = new PrintWriter(sw);
 
-        Pattern p = Pattern.compile("jdbc:mysql://([^:/]+)(?::(\\d+))?/([^?]+)");
-        Matcher m = p.matcher(datasourceUrl);
-        if (m.find()) {
-            host   = m.group(1);
-            port   = m.group(2) != null ? Integer.parseInt(m.group(2)) : 3306;
-            dbName = m.group(3);
-        }
+        try (Connection conn = dataSource.getConnection()) {
+            String catalog = conn.getCatalog();
+            DatabaseMetaData meta = conn.getMetaData();
 
-        List<String> cmd = new ArrayList<>();
-        cmd.add("mysqldump");
-        cmd.add("-h"); cmd.add(host);
-        cmd.add("-P"); cmd.add(String.valueOf(port));
-        cmd.add("-u"); cmd.add(dbUsername);
-        if (dbPassword != null && !dbPassword.isBlank()) {
-            cmd.add("-p" + dbPassword);   // no space between -p and password
-        }
-        cmd.add("--single-transaction");
-        cmd.add("--routines");
-        cmd.add("--triggers");
-        cmd.add(dbName);
+            pw.println("-- PWJ Tracker Database Backup");
+            pw.println("-- Generated: " + LocalDateTime.now());
+            pw.println("-- Database: " + catalog);
+            pw.println();
+            pw.println("SET FOREIGN_KEY_CHECKS=0;");
+            pw.println();
 
-        log.info("Running: mysqldump -h {} -P {} -u {} [password] --single-transaction {}", host, port, dbUsername, dbName);
-
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.redirectErrorStream(false);
-        Process process = pb.start();
-
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try (InputStream is = process.getInputStream()) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) != -1) out.write(buf, 0, n);
-        }
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            // Read stderr for diagnostic
-            String stderr = new String(process.getErrorStream().readAllBytes());
-            log.warn("mysqldump exited with code {}. Stderr: {}", exitCode, stderr);
-            // If mysqldump is unavailable, fall back to a simple notice file
-            if (out.size() == 0) {
-                String notice = "-- mysqldump not available on this host. Exit code: " + exitCode + "\n-- " + stderr;
-                return notice.getBytes();
+            List<String> tables = new ArrayList<>();
+            try (ResultSet rs = meta.getTables(catalog, null, "%", new String[]{"TABLE"})) {
+                while (rs.next()) tables.add(rs.getString("TABLE_NAME"));
             }
+
+            for (String table : tables) {
+                pw.println("-- --------------------------------------------------------");
+                pw.println("-- Table: " + table);
+                pw.println("-- --------------------------------------------------------");
+
+                // CREATE TABLE statement
+                try (Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery("SHOW CREATE TABLE `" + table + "`")) {
+                    if (rs.next()) {
+                        pw.println("DROP TABLE IF EXISTS `" + table + "`;");
+                        pw.println(rs.getString(2) + ";");
+                        pw.println();
+                    }
+                }
+
+                // Row data as INSERT statements
+                try (Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery("SELECT * FROM `" + table + "`")) {
+
+                    ResultSetMetaData rsMeta = rs.getMetaData();
+                    int colCount = rsMeta.getColumnCount();
+
+                    while (rs.next()) {
+                        StringBuilder sb = new StringBuilder("INSERT INTO `").append(table).append("` VALUES (");
+                        for (int i = 1; i <= colCount; i++) {
+                            if (i > 1) sb.append(", ");
+                            Object val = rs.getObject(i);
+                            if (val == null) {
+                                sb.append("NULL");
+                            } else if (val instanceof Number) {
+                                sb.append(val);
+                            } else if (val instanceof Boolean) {
+                                sb.append(((Boolean) val) ? 1 : 0);
+                            } else {
+                                // Escape single quotes and backslashes
+                                String s = val.toString()
+                                        .replace("\\", "\\\\")
+                                        .replace("'", "\\'")
+                                        .replace("\n", "\\n")
+                                        .replace("\r", "\\r");
+                                sb.append("'").append(s).append("'");
+                            }
+                        }
+                        sb.append(");");
+                        pw.println(sb);
+                    }
+                }
+                pw.println();
+            }
+
+            pw.println("SET FOREIGN_KEY_CHECKS=1;");
         }
-        return out.toByteArray();
+
+        pw.flush();
+        return sw.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     // ── Email ─────────────────────────────────────────────────────────────────
@@ -160,13 +174,11 @@ public class BackupService {
             true
         );
 
-        // Excel attachment
         helper.addAttachment(
             "PWJ-Backup-" + dateSuffix + ".xlsx",
             new ByteArrayDataSource(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         );
 
-        // SQL dump attachment
         helper.addAttachment(
             "PWJ-DB-Backup-" + dateSuffix + ".sql",
             new ByteArrayDataSource(dbBytes, "application/sql")
