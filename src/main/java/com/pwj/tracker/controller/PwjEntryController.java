@@ -93,6 +93,12 @@ public class PwjEntryController {
         return ResponseEntity.ok(ApiResponse.ok("Projects fetched", service.getProjectNames()));
     }
 
+    /** GET /api/v1/pwj/entries/docs — Account module: list all docs with computed totals for expense picker */
+    @GetMapping("/entries/docs")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getDocSummaries() {
+        return ResponseEntity.ok(ApiResponse.ok("Doc summaries", service.getDocSummaries()));
+    }
+
     @GetMapping("/pending-approvals")
     public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingApprovals() {
         return ResponseEntity.ok(ApiResponse.ok("Pending approvals", service.getPendingApprovals()));

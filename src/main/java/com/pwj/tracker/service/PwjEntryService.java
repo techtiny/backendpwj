@@ -27,6 +27,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -251,6 +256,46 @@ public class PwjEntryService {
                         List.of(PwjEntry.ApprovalStatus.HOLD, PwjEntry.ApprovalStatus.NOT_APPROVED),
                         PwjEntry.EntryStatus.OPEN)
                 .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    // ── Doc summary for Account Expenses picker ───────────────────────────
+    public List<Map<String, Object>> getDocSummaries() {
+        ObjectMapper mapper = new ObjectMapper();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (PwjEntry e : repository.findAllWithDocData()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("docNumber",        e.getDocNumber());
+            m.put("pwjType",          e.getPwjType());
+            m.put("vendor",           e.getVendor());
+            m.put("materialRequired", e.getMaterialRequired());
+            m.put("projectName",      e.getProjectName());
+            double gross = 0;
+            double gstPct = 18;
+            try {
+                JsonNode data = mapper.readTree(e.getDocData());
+                JsonNode items = data.path("items");
+                for (JsonNode item : items) {
+                    double qty  = parseD(item.path("qty").asText("0"));
+                    double rate = parseD(item.path("rate").asText("0"));
+                    gross += qty * rate;
+                }
+                double cgst = parseD(data.path("cgstPct").asText("0"));
+                double sgst = parseD(data.path("sgstPct").asText("0"));
+                double igst = parseD(data.path("igstPct").asText("0"));
+                gstPct = (cgst + sgst > 0) ? cgst + sgst : igst;
+            } catch (Exception ex) { /* keep defaults */ }
+            double gstAmt = Math.round(gross * gstPct / 100 * 100.0) / 100.0;
+            m.put("gross",        gross);
+            m.put("gstPct",       gstPct);
+            m.put("gstAmount",    gstAmt);
+            m.put("totalPayable", Math.round((gross + gstAmt) * 100.0) / 100.0);
+            result.add(m);
+        }
+        return result;
+    }
+
+    private double parseD(String s) {
+        try { return Double.parseDouble(s.trim()); } catch (Exception e) { return 0; }
     }
 
     // ── Submit document for VP approval ───────────────────────────────────

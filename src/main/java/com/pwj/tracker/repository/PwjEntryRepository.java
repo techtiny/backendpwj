@@ -49,6 +49,9 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
 
     List<PwjEntry> findByDocStatus(PwjEntry.DocStatus docStatus);
 
+    @Query("SELECT e FROM PwjEntry e WHERE e.docNumber IS NOT NULL AND e.docData IS NOT NULL ORDER BY e.updatedAt DESC")
+    List<PwjEntry> findAllWithDocData();
+
     @Modifying
     @Query("UPDATE PwjEntry e SET e.dependency = 'OH Approval' WHERE e.dependency IS NULL OR e.dependency = ''")
     int backfillNullDependency();
