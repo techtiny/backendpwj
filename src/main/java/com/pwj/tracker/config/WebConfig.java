@@ -11,13 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.web.servlet.config.annotation.*;
 
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Configuration
@@ -28,18 +25,25 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
-    public CorsFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.addAllowedOriginPattern("*");
-        config.addAllowedHeader("*");
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setExposedHeaders(List.of("Authorization", "Content-Type"));
-        config.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+    public FilterRegistrationBean<jakarta.servlet.Filter> corsFilter() {
+        FilterRegistrationBean<jakarta.servlet.Filter> bean = new FilterRegistrationBean<>();
+        bean.setFilter((req, res, chain) -> {
+            jakarta.servlet.http.HttpServletResponse response = (jakarta.servlet.http.HttpServletResponse) res;
+            jakarta.servlet.http.HttpServletRequest  request  = (jakarta.servlet.http.HttpServletRequest)  req;
+            response.setHeader("Access-Control-Allow-Origin",      request.getHeader("Origin") != null ? request.getHeader("Origin") : "*");
+            response.setHeader("Access-Control-Allow-Credentials", "true");
+            response.setHeader("Access-Control-Allow-Methods",     "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+            response.setHeader("Access-Control-Allow-Headers",     "*");
+            response.setHeader("Access-Control-Max-Age",           "3600");
+            if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_OK);
+                return;
+            }
+            chain.doFilter(req, res);
+        });
+        bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        bean.addUrlPatterns("/*");
+        return bean;
     }
 
     @Override
