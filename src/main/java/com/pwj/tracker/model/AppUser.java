@@ -37,7 +37,7 @@ public class AppUser {
     private String phone;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, length = 20)
+    @Column(name = "role", nullable = false, length = 30)
     private Role role;
 
     @Column(name = "active", nullable = false)
@@ -58,6 +58,6 @@ public class AppUser {
     private LocalDateTime updatedAt;
 
     public enum Role {
-        ADMIN, ENGINEER, PROCUREMENT, VP, OH, CEO
+        ADMIN, ENGINEER, PROCUREMENT, VP, OH, CEO, PROJECT_MANAGER
     }
 }
