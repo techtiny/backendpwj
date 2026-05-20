@@ -26,13 +26,15 @@ public class FileUploadController {
     public ResponseEntity<ApiResponse<String>> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
             String contentType = file.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
+            boolean allowed = contentType != null &&
+                    (contentType.startsWith("image/") || contentType.equals("application/pdf"));
+            if (!allowed) {
                 return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Only image files are allowed"));
+                    .body(ApiResponse.error("Only image or PDF files are allowed"));
             }
-            if (file.getSize() > 5 * 1024 * 1024) {
+            if (file.getSize() > 10 * 1024 * 1024) {
                 return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("File size must be under 5MB"));
+                    .body(ApiResponse.error("File size must be under 10MB"));
             }
 
             String ext = getExtension(file.getOriginalFilename());

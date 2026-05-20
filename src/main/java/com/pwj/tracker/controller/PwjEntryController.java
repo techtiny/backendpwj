@@ -1,5 +1,6 @@
 package com.pwj.tracker.controller;
 
+import com.pwj.tracker.config.SseBroadcaster;
 import com.pwj.tracker.dto.*;
 import com.pwj.tracker.service.PwjEntryService;
 import jakarta.validation.Valid;
@@ -7,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,12 @@ import java.util.Map;
 public class PwjEntryController {
 
     private final PwjEntryService service;
+    private final SseBroadcaster  sseBroadcaster;
+
+    @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter subscribe() {
+        return sseBroadcaster.subscribe();
+    }
 
     @GetMapping("/entries")
     public ResponseEntity<ApiResponse<PagedResponse<PwjEntryResponse>>> getEntries(
@@ -25,21 +33,34 @@ public class PwjEntryController {
             @RequestParam(required = false)     String status,
             @RequestParam(required = false)     String approval,
             @RequestParam(required = false)     String projectName,
+            @RequestParam(required = false)     String raisedBy,
+            @RequestParam(required = false)     String dateFrom,
+            @RequestParam(required = false)     String dateTo,
             @RequestParam(defaultValue = "0")   int    page,
             @RequestParam(defaultValue = "15")  int    size,
             @RequestParam(defaultValue = "updatedAt") String sortBy,
             @RequestParam(defaultValue = "desc")      String sortDir) {
         return ResponseEntity.ok(ApiResponse.ok("Entries fetched",
-                service.getAll(search, status, approval, projectName, page, size, sortBy, sortDir)));
+                service.getAll(search, status, approval, projectName, raisedBy,
+                        dateFrom, dateTo, page, size, sortBy, sortDir)));
     }
 
     @GetMapping("/entries/my")
     public ResponseEntity<ApiResponse<PagedResponse<PwjEntryResponse>>> getMyEntries(
             @RequestParam String raisedBy,
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "15") int size) {
+            @RequestParam(required = false)              String search,
+            @RequestParam(required = false)              String status,
+            @RequestParam(required = false)              String approval,
+            @RequestParam(required = false)              String projectName,
+            @RequestParam(required = false)              String dateFrom,
+            @RequestParam(required = false)              String dateTo,
+            @RequestParam(defaultValue = "0")            int    page,
+            @RequestParam(defaultValue = "15")           int    size,
+            @RequestParam(defaultValue = "updatedAt")    String sortBy,
+            @RequestParam(defaultValue = "desc")         String sortDir) {
         return ResponseEntity.ok(ApiResponse.ok("My entries fetched",
-                service.getByEngineer(raisedBy, page, size)));
+                service.getByEngineer(raisedBy, search, status, approval,
+                        projectName, dateFrom, dateTo, page, size, sortBy, sortDir)));
     }
 
     @GetMapping("/entries/{id}")
