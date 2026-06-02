@@ -122,6 +122,31 @@ public class FileUploadController {
         }
     }
 
+    /** POST /api/v1/upload/restore — one-time use: re-upload a file with its original UUID filename */
+    @PostMapping("/restore")
+    public ResponseEntity<ApiResponse<String>> restore(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("filename") String filename,
+            @RequestParam("secret") String secret) {
+
+        if (!"pwj-restore-2026".equals(secret)) {
+            return ResponseEntity.status(403).body(ApiResponse.error("Unauthorized"));
+        }
+        if (!filename.matches("[0-9a-fA-F\\-]{36}\\.[a-zA-Z0-9]{2,5}")) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Invalid filename format"));
+        }
+        try {
+            Path dir = Paths.get(uploadDir);
+            Files.createDirectories(dir);
+            Files.copy(file.getInputStream(), dir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+            log.info("Restored file: {}", filename);
+            return ResponseEntity.ok(ApiResponse.ok("Restored", filename));
+        } catch (IOException e) {
+            log.error("Restore failed for {}", filename, e);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("Failed: " + e.getMessage()));
+        }
+    }
+
     private String getExtension(String filename) {
         if (filename == null || !filename.contains(".")) return ".jpg";
         return filename.substring(filename.lastIndexOf("."));
