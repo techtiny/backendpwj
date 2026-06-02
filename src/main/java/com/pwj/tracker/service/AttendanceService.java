@@ -85,7 +85,10 @@ public class AttendanceService {
 
     public List<Attendance> getFieldStaffAttendance() {
         List<AppUser.Role> fieldRoles = List.of(AppUser.Role.ENGINEER, AppUser.Role.PROJECT_MANAGER);
-        return attendanceRepository.findByUserRoles(fieldRoles);
+        List<String> usernames = userRepository.findByRoleInAndActiveTrue(fieldRoles)
+                .stream().map(AppUser::getUsername).toList();
+        if (usernames.isEmpty()) return List.of();
+        return attendanceRepository.findByUsernameInOrderByWorkDateDescCheckInTimeDesc(usernames);
     }
 
     public Map<String, Object> getSummary(String username) {

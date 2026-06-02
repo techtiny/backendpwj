@@ -16,6 +16,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     List<AppUser> findByRoleAndActiveTrue(AppUser.Role role);
 
+    List<AppUser> findByRoleInAndActiveTrue(List<AppUser.Role> roles);
+
     boolean existsByUsername(String username);
 
     java.util.Optional<AppUser> findByFullNameAndActiveTrue(String fullName);
