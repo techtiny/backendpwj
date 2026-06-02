@@ -62,6 +62,12 @@ public class AttendanceController {
         return ResponseEntity.ok(ApiResponse.ok("All records", service.getAll()));
     }
 
+    /** GET /api/v1/hr/attendance/field-staff  (VP, OH, Admin) */
+    @GetMapping("/field-staff")
+    public ResponseEntity<ApiResponse<List<Attendance>>> getFieldStaff() {
+        return ResponseEntity.ok(ApiResponse.ok("Field staff attendance", service.getFieldStaffAttendance()));
+    }
+
     /** GET /api/v1/hr/attendance/summary/{username} */
     @GetMapping("/summary/{username}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getSummary(@PathVariable String username) {

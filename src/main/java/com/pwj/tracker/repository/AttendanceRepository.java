@@ -1,8 +1,10 @@
 package com.pwj.tracker.repository;
 
+import com.pwj.tracker.model.AppUser;
 import com.pwj.tracker.model.Attendance;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -28,4 +30,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("SELECT COUNT(a) FROM Attendance a WHERE a.username = :username AND a.workDate >= :from")
     long countByUsernameSince(String username, LocalDate from);
+
+    @Query("SELECT a FROM Attendance a WHERE a.username IN " +
+           "(SELECT u.username FROM AppUser u WHERE u.role IN :roles AND u.active = true) " +
+           "ORDER BY a.workDate DESC, a.checkInTime DESC")
+    List<Attendance> findByUserRoles(@Param("roles") List<AppUser.Role> roles);
 }

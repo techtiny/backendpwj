@@ -83,6 +83,11 @@ public class AttendanceService {
         return attendanceRepository.findAllByOrderByWorkDateDescCheckInTimeDesc();
     }
 
+    public List<Attendance> getFieldStaffAttendance() {
+        List<AppUser.Role> fieldRoles = List.of(AppUser.Role.ENGINEER, AppUser.Role.PROJECT_MANAGER);
+        return attendanceRepository.findByUserRoles(fieldRoles);
+    }
+
     public Map<String, Object> getSummary(String username) {
         LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
         long presentDays = attendanceRepository.countByUsernameAndStatusSince(username, "PRESENT", monthStart);
