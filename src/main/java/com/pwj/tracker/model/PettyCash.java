@@ -63,6 +63,9 @@ public class PettyCash {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    @Column(name = "project_name", length = 200)
+    private String projectName;
+
     @Column(name = "attachment_url", length = 500)
     private String attachmentUrl;
 

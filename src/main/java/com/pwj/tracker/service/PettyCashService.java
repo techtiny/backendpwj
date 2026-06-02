@@ -26,7 +26,7 @@ public class PettyCashService {
     @Transactional
     public PettyCash create(String username, LocalDate expenseDate, String category,
                             String description, BigDecimal amount, String paymentMode,
-                            String attachmentUrl) {
+                            String attachmentUrl, String projectName) {
         AppUser user = userRepo.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
@@ -39,6 +39,7 @@ public class PettyCashService {
                 .amount(amount)
                 .paymentMode(paymentMode)
                 .attachmentUrl(attachmentUrl)
+                .projectName(projectName)
                 .status("PENDING")
                 .build());
     }

@@ -30,8 +30,10 @@ public class PettyCashController {
                 ? LocalDate.parse(body.get("expenseDate").toString()) : null;
         String attachmentUrl = body.get("attachmentUrl") != null
                 ? body.get("attachmentUrl").toString() : null;
+        String projectName = body.get("projectName") != null
+                ? body.get("projectName").toString() : null;
         return ResponseEntity.ok(ApiResponse.ok("Entry created",
-                service.create(username, date, category, description, amount, paymentMode, attachmentUrl)));
+                service.create(username, date, category, description, amount, paymentMode, attachmentUrl, projectName)));
     }
 
     @GetMapping("/my/{username}")
