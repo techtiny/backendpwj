@@ -28,6 +28,12 @@ public class ProjectController {
         return ApiResponse.ok("Projects fetched", projectRepository.findAllByOrderByNameAsc());
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<Project> getById(@PathVariable Long id) {
+        return ApiResponse.ok("Project fetched", projectRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Project not found: " + id)));
+    }
+
     @GetMapping("/active")
     public ApiResponse<List<Project>> getActive() {
         return ApiResponse.ok("Active projects fetched", projectRepository.findByActiveTrueOrderByNameAsc());

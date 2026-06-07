@@ -42,6 +42,7 @@ public class PwjEntryRequest {
     private String docData;
     private String docNumber;
     private String dependency;
+    private Long projectId;
 }
 
 // ============ Approval Action Request ============

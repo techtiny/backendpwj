@@ -22,7 +22,8 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
                LOWER(e.projectName)      LIKE LOWER(CONCAT('%', :search, '%')) OR
                LOWER(e.raisedBy)         LIKE LOWER(CONCAT('%', :search, '%')) OR
                LOWER(e.vendor)           LIKE LOWER(CONCAT('%', :search, '%')) OR
-               LOWER(e.boqNo)            LIKE LOWER(CONCAT('%', :search, '%')))
+               LOWER(e.boqNo)            LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.docNumber)        LIKE LOWER(CONCAT('%', :search, '%')))
         AND (:status      IS NULL OR e.status         = :status)
         AND (:approval    IS NULL OR e.approvalStatus = :approval)
         AND (:projectName IS NULL OR :projectName = '' OR LOWER(e.projectName) = LOWER(:projectName))
@@ -60,7 +61,7 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
 
     List<PwjEntry> findByDocStatus(PwjEntry.DocStatus docStatus);
 
-    @Query("SELECT e FROM PwjEntry e WHERE e.docNumber IS NOT NULL AND e.docData IS NOT NULL ORDER BY e.updatedAt DESC")
+    @Query("SELECT e FROM PwjEntry e WHERE e.docNumber IS NOT NULL ORDER BY e.updatedAt DESC")
     List<PwjEntry> findAllWithDocData();
 
     @Modifying

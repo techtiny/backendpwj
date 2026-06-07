@@ -104,6 +104,10 @@ public class PwjEntry {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    // ── Account system link ───────────────────────────────────────────────
+    @Column(name = "account_project_id")
+    private Long projectId;
+
     // ── Document Workflow ─────────────────────────────────────────────────
     @Column(name = "doc_number", length = 30)
     private String docNumber;

@@ -10,12 +10,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AttendanceService {
+
+    private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
     private final AttendanceRepository attendanceRepository;
     private final AppUserRepository userRepository;
@@ -25,7 +28,7 @@ public class AttendanceService {
         AppUser user = userRepository.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(IST);
         Optional<Attendance> existing = attendanceRepository.findByUsernameAndWorkDate(username, today);
         if (existing.isPresent() && existing.get().getCheckInTime() != null) {
             throw new RuntimeException("Already checked in today");
@@ -38,7 +41,7 @@ public class AttendanceService {
                 .status("PRESENT")
                 .build());
 
-        att.setCheckInTime(LocalDateTime.now());
+        att.setCheckInTime(LocalDateTime.now(IST));
         att.setCheckInLat(lat);
         att.setCheckInLng(lng);
         att.setCheckInAddress(address);
@@ -48,14 +51,14 @@ public class AttendanceService {
 
     @Transactional
     public Attendance checkOut(String username, Double lat, Double lng, String address) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(IST);
         Attendance att = attendanceRepository.findByUsernameAndWorkDate(username, today)
                 .orElseThrow(() -> new RuntimeException("No check-in found for today"));
 
         if (att.getCheckInTime() == null) throw new RuntimeException("Must check in first");
         if (att.getCheckOutTime() != null) throw new RuntimeException("Already checked out today");
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(IST); // IST — Railway server runs UTC
         att.setCheckOutTime(now);
         att.setCheckOutLat(lat);
         att.setCheckOutLng(lng);
@@ -68,7 +71,7 @@ public class AttendanceService {
     }
 
     public Optional<Attendance> getTodayRecord(String username) {
-        return attendanceRepository.findByUsernameAndWorkDate(username, LocalDate.now());
+        return attendanceRepository.findByUsernameAndWorkDate(username, LocalDate.now(IST));
     }
 
     public List<Attendance> getUserHistory(String username) {
@@ -76,7 +79,7 @@ public class AttendanceService {
     }
 
     public List<Attendance> getTodayAll() {
-        return attendanceRepository.findByWorkDateOrderByFullNameAsc(LocalDate.now());
+        return attendanceRepository.findByWorkDateOrderByFullNameAsc(LocalDate.now(IST));
     }
 
     public List<Attendance> getAll() {
@@ -92,7 +95,7 @@ public class AttendanceService {
     }
 
     public Map<String, Object> getSummary(String username) {
-        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        LocalDate monthStart = LocalDate.now(IST).withDayOfMonth(1);
         long presentDays = attendanceRepository.countByUsernameAndStatusSince(username, "PRESENT", monthStart);
         long halfDays    = attendanceRepository.countByUsernameAndStatusSince(username, "HALF_DAY", monthStart);
         long totalDays   = attendanceRepository.countByUsernameSince(username, monthStart);
@@ -101,7 +104,7 @@ public class AttendanceService {
         m.put("presentDays", presentDays);
         m.put("halfDays", halfDays);
         m.put("totalDays", totalDays);
-        m.put("absentDays", Math.max(0, LocalDate.now().getDayOfMonth() - totalDays));
+        m.put("absentDays", Math.max(0, LocalDate.now(IST).getDayOfMonth() - totalDays));
         return m;
     }
 }

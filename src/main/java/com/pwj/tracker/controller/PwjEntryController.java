@@ -23,8 +23,11 @@ public class PwjEntryController {
     private final SseBroadcaster  sseBroadcaster;
 
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe() {
-        return sseBroadcaster.subscribe();
+    public ResponseEntity<SseEmitter> subscribe(jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering on Railway
+        response.setHeader("Connection", "keep-alive");
+        return ResponseEntity.ok(sseBroadcaster.subscribe());
     }
 
     @GetMapping("/entries")
@@ -68,6 +71,13 @@ public class PwjEntryController {
         return ResponseEntity.ok(ApiResponse.ok("Entry fetched", service.getById(id)));
     }
 
+    @PostMapping("/entries/{id}/split-by-vendor")
+    public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> splitByVendor(
+            @PathVariable Long id,
+            @RequestBody List<com.pwj.tracker.dto.SplitVendorRequest> splits) {
+        return ResponseEntity.ok(ApiResponse.ok("Split POs created", service.splitByVendor(id, splits)));
+    }
+
     @PostMapping("/entries")
     public ResponseEntity<ApiResponse<PwjEntryResponse>> createEntry(
             @Valid @RequestBody PwjEntryRequest req,
@@ -81,7 +91,7 @@ public class PwjEntryController {
 
     @PutMapping("/entries/{id}")
     public ResponseEntity<ApiResponse<PwjEntryResponse>> updateEntry(
-            @PathVariable Long id, @Valid @RequestBody PwjEntryRequest req) {
+            @PathVariable Long id, @RequestBody PwjEntryRequest req) {
         return ResponseEntity.ok(ApiResponse.ok("Entry updated", service.update(id, req)));
     }
 
@@ -118,6 +128,12 @@ public class PwjEntryController {
     @GetMapping("/entries/docs")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getDocSummaries() {
         return ResponseEntity.ok(ApiResponse.ok("Doc summaries", service.getDocSummaries()));
+    }
+
+    /** GET /api/v1/pwj/budget-summary — Aggregated expense totals per project: PO→material, WO→subcontract, JO→labour */
+    @GetMapping("/budget-summary")
+    public ResponseEntity<ApiResponse<Map<String, Map<String, Double>>>> getBudgetSummary() {
+        return ResponseEntity.ok(ApiResponse.ok("Budget summary", service.getBudgetSummary()));
     }
 
     @GetMapping("/pending-approvals")

@@ -34,8 +34,8 @@ public class SseBroadcaster {
         emitters.removeAll(dead);
     }
 
-    // Heartbeat every 25 s — keeps connections alive through proxies/Railway
-    @Scheduled(fixedDelay = 25000)
+    // Heartbeat every 15 s — well under Railway's 30 s proxy idle timeout
+    @Scheduled(fixedDelay = 15000)
     public void heartbeat() {
         List<SseEmitter> dead = new ArrayList<>();
         for (SseEmitter emitter : emitters) {

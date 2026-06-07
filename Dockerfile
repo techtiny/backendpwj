@@ -9,4 +9,5 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/pwj-tracker-1.0.0.jar app.jar
 EXPOSE 8081
+ENV JAVA_TOOL_OPTIONS="-Xmx256m -Xms64m -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError"
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -115,6 +115,7 @@ public class PwjEntryService {
                 .timestamp(LocalDateTime.now())
                 .raisedBy(req.getRaisedBy())
                 .projectName(req.getProjectName())
+                .projectId(req.getProjectId())
                 .boqNo(req.getBoqNo())
                 .materialRequired(req.getMaterialRequired())
                 .specification(req.getSpecification())
@@ -145,6 +146,7 @@ public class PwjEntryService {
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
         entry.setRaisedBy(req.getRaisedBy());
         entry.setProjectName(req.getProjectName());
+        if (req.getProjectId() != null) entry.setProjectId(req.getProjectId());
         entry.setBoqNo(req.getBoqNo());
         entry.setMaterialRequired(req.getMaterialRequired());
         entry.setSpecification(req.getSpecification());
@@ -257,6 +259,62 @@ public class PwjEntryService {
         return saveAndBroadcast(entry);
     }
 
+    // ── Split one entry into multiple POs by vendor ───────────────────────
+    @Transactional
+    public List<PwjEntryResponse> splitByVendor(Long parentId, List<com.pwj.tracker.dto.SplitVendorRequest> splits) {
+        PwjEntry parent = repository.findById(parentId)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        List<PwjEntryResponse> results = new ArrayList<>();
+        ObjectMapper mapper = new ObjectMapper();
+
+        for (com.pwj.tracker.dto.SplitVendorRequest split : splits) {
+            try {
+                // Build docData JSON with this vendor's items
+                String docData = mapper.writeValueAsString(java.util.Map.of("items", split.getItems()));
+
+                // Generate a doc number
+                java.time.LocalDate today = java.time.LocalDate.now();
+                int month = today.getMonthValue();
+                int year  = today.getYear();
+                int fyStart = month >= 4 ? year : year - 1;
+                String fy = String.format("%02d%02d", fyStart % 100, (fyStart + 1) % 100);
+
+                PwjEntry child = PwjEntry.builder()
+                        .timestamp(LocalDateTime.now())
+                        .raisedBy(parent.getRaisedBy())
+                        .projectName(parent.getProjectName())
+                        .boqNo(parent.getBoqNo())
+                        .materialRequired(parent.getMaterialRequired())
+                        .specification(parent.getSpecification())
+                        .unit(parent.getUnit())
+                        .quantity(parent.getQuantity())
+                        .approvalStatus(PwjEntry.ApprovalStatus.PROCEED)
+                        .approvedBy(parent.getApprovedBy())
+                        .approvedAt(parent.getApprovedAt())
+                        .vendor(split.getVendor())
+                        .pwjType(split.getPwjType())
+                        .pwjIssued(false)
+                        .ack(false)
+                        .vendorAcknowledged(false)
+                        .vendorEmailEnabled(false)
+                        .status(PwjEntry.EntryStatus.OPEN)
+                        .dependency("VP Approval")
+                        .docData(docData)
+                        .build();
+
+                PwjEntry saved = repository.save(child);
+                // Set doc number using saved ID
+                saved.setDocNumber(split.getPwjType() + "-" + fy + "-" + String.format("%04d", saved.getId()));
+                saved.setDocStatus(PwjEntry.DocStatus.PENDING_VP_APPROVAL);
+                results.add(toResponse(repository.save(saved)));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create split PO for vendor " + split.getVendor() + ": " + e.getMessage());
+            }
+        }
+        sseBroadcaster.broadcast();
+        return results;
+    }
+
     // ── Delete (Admin) ────────────────────────────────────────────────────
     @Transactional
     public void delete(Long id) {
@@ -287,6 +345,7 @@ public class PwjEntryService {
             m.put("vendor",           e.getVendor());
             m.put("materialRequired", e.getMaterialRequired());
             m.put("projectName",      e.getProjectName());
+            m.put("projectId",        e.getProjectId());
             double gross = 0;
             double gstPct = 18;
             try {
@@ -308,6 +367,28 @@ public class PwjEntryService {
             m.put("gstAmount",    gstAmt);
             m.put("totalPayable", Math.round((gross + gstAmt) * 100.0) / 100.0);
             result.add(m);
+        }
+        return result;
+    }
+
+    public Map<String, Map<String, Double>> getBudgetSummary() {
+        Map<String, Map<String, Double>> result = new LinkedHashMap<>();
+        for (Map<String, Object> doc : getDocSummaries()) {
+            String pName = doc.get("projectName") instanceof String
+                    ? ((String) doc.get("projectName")).trim() : null;
+            String pType = doc.get("pwjType") instanceof String
+                    ? (String) doc.get("pwjType") : null;
+            if (pName == null || pType == null) continue;
+            double gross = doc.get("gross") instanceof Number
+                    ? ((Number) doc.get("gross")).doubleValue() : 0;
+            String cat = switch (pType.toUpperCase()) {
+                case "PO" -> "material";
+                case "WO" -> "subcontract";
+                case "JO" -> "labour";
+                default   -> "miscellaneous";
+            };
+            result.computeIfAbsent(pName, k -> new LinkedHashMap<>())
+                  .merge(cat, gross, Double::sum);
         }
         return result;
     }
@@ -352,6 +433,7 @@ public class PwjEntryService {
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
         entry.setDocStatus(PwjEntry.DocStatus.VP_APPROVED);
         entry.setDependency("Procurement");
+        entry.setApprovedAt(LocalDateTime.now());
         if (comment != null && !comment.isBlank()) entry.setDocComments(comment.trim());
         return saveAndBroadcast(entry);
     }
@@ -691,7 +773,7 @@ public class PwjEntryService {
     private PwjEntryResponse toResponse(PwjEntry e) {
         return PwjEntryResponse.builder()
                 .id(e.getId()).timestamp(e.getTimestamp())
-                .raisedBy(e.getRaisedBy()).projectName(e.getProjectName())
+                .raisedBy(e.getRaisedBy()).projectName(e.getProjectName()).projectId(e.getProjectId())
                 .boqNo(e.getBoqNo()).materialRequired(e.getMaterialRequired())
                 .specification(e.getSpecification()).brand(e.getBrand())
                 .unit(e.getUnit()).quantity(e.getQuantity())

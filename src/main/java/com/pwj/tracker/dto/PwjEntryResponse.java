@@ -44,6 +44,7 @@ public class PwjEntryResponse {
     private String approvalComment;
     private String approvedBy;
     private LocalDateTime approvedAt;
+    private Long projectId;
     private String docNumber;
     private PwjEntry.DocStatus docStatus;
     private String docComments;
