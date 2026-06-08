@@ -26,6 +26,11 @@ public class LeaveRequestService {
                               LocalDate toDate, String reason, String attachmentUrl) {
         AppUser user = userRepository.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        if (user.getRole() == AppUser.Role.VP ||
+            user.getRole() == AppUser.Role.CEO ||
+            user.getRole() == AppUser.Role.OH) {
+            throw new RuntimeException("VP, CEO and OH roles are not permitted to apply for leave");
+        }
         if (fromDate.isAfter(toDate)) throw new RuntimeException("From date must be before to date");
 
         int days = (int) ChronoUnit.DAYS.between(fromDate, toDate) + 1;
