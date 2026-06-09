@@ -460,7 +460,7 @@ public class PwjEntryService {
         if (entry.getDocStatus() != PwjEntry.DocStatus.VP_APPROVED) {
             throw new RuntimeException("Only VP_APPROVED documents can be revoked");
         }
-        entry.setDocStatus(PwjEntry.DocStatus.DRAFT);
+        entry.setDocStatus(PwjEntry.DocStatus.REVOKED);
         entry.setApprovedAt(null);
         entry.setDocComments(reason != null && !reason.isBlank()
                 ? "[Approval Revoked by VP] " + reason.trim()
