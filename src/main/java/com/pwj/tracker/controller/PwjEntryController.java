@@ -156,6 +156,15 @@ public class PwjEntryController {
         return ResponseEntity.ok(ApiResponse.ok("Document approved", service.approveDoc(id, comment)));
     }
 
+    /** PATCH /api/v1/pwj/entries/{id}/doc-revoke — VP only: revoke an already-approved document */
+    @PatchMapping("/entries/{id}/doc-revoke")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> revokeDoc(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
+        return ResponseEntity.ok(ApiResponse.ok("Approval revoked", service.revokeDoc(id, reason)));
+    }
+
     /** PATCH /api/v1/pwj/entries/{id}/doc-reject — VP only: reject document with optional comment */
     @PatchMapping("/entries/{id}/doc-reject")
     public ResponseEntity<ApiResponse<PwjEntryResponse>> rejectDoc(

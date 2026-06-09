@@ -452,6 +452,22 @@ public class PwjEntryService {
         return saveAndBroadcast(entry);
     }
 
+    // ── VP: revoke approval — resets doc back to DRAFT ───────────────────
+    @Transactional
+    public PwjEntryResponse revokeDoc(Long id, String reason) {
+        PwjEntry entry = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (entry.getDocStatus() != PwjEntry.DocStatus.VP_APPROVED) {
+            throw new RuntimeException("Only VP_APPROVED documents can be revoked");
+        }
+        entry.setDocStatus(PwjEntry.DocStatus.DRAFT);
+        entry.setApprovedAt(null);
+        entry.setDocComments(reason != null && !reason.isBlank()
+                ? "[Approval Revoked by VP] " + reason.trim()
+                : "[Approval Revoked by VP]");
+        return saveAndBroadcast(entry);
+    }
+
     // ── VP/Admin: toggle vendor email enabled ─────────────────────────────
     @Transactional
     public PwjEntryResponse toggleVendorEmail(Long id) {
