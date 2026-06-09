@@ -119,6 +119,9 @@ public class PwjEntry {
     @Column(name = "doc_comments", columnDefinition = "TEXT")
     private String docComments;
 
+    @Column(name = "site_remarks", columnDefinition = "TEXT")
+    private String siteRemarks;
+
     @Column(name = "doc_data", columnDefinition = "TEXT")
     private String docData;
 

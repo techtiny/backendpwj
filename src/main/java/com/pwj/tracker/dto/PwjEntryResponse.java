@@ -48,6 +48,7 @@ public class PwjEntryResponse {
     private String docNumber;
     private PwjEntry.DocStatus docStatus;
     private String docComments;
+    private String siteRemarks;
     private String docData;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

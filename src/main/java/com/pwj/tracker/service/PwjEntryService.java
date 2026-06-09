@@ -192,6 +192,7 @@ public class PwjEntryService {
             entry.setStatus(PwjEntry.EntryStatus.CLOSED);
         }
         if (req.getRemarks()     != null) entry.setRemarks(req.getRemarks());
+        if (req.getSiteRemarks() != null) entry.setSiteRemarks(req.getSiteRemarks());
         if (req.getDependency()  != null) entry.setDependency(req.getDependency());
         if (req.getAck()         != null) {
             entry.setAck(req.getAck());
@@ -806,6 +807,7 @@ public class PwjEntryService {
                 .approvedBy(e.getApprovedBy()).approvedAt(e.getApprovedAt())
                 .docNumber(e.getDocNumber()).docStatus(e.getDocStatus())
                 .docComments(e.getDocComments())
+                .siteRemarks(e.getSiteRemarks())
                 .docData(e.getDocData())
                 .dependency(e.getDependency())
                 .ack(Boolean.TRUE.equals(e.getAck()))
