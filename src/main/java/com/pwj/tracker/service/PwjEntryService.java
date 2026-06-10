@@ -218,6 +218,13 @@ public class PwjEntryService {
         if (req.getPwjType() != null && !req.getPwjType().isBlank()) {
             boolean isNewPwjType = !req.getPwjType().equals(entry.getPwjType());
             entry.setPwjType(req.getPwjType());
+            if (isNewPwjType && entry.getDocNumber() != null) {
+                // Keep the doc number's prefix (PO/WO/JO) in sync with the new type
+                int dashIdx = entry.getDocNumber().indexOf('-');
+                if (dashIdx > 0) {
+                    entry.setDocNumber(req.getPwjType() + entry.getDocNumber().substring(dashIdx));
+                }
+            }
             if (isNewPwjType && PwjEntry.ApprovalStatus.PROCEED.equals(entry.getApprovalStatus())) {
                 // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendVendorEmail(snapshot));
             }
