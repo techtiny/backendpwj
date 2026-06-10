@@ -42,10 +42,11 @@ public class PwjEntryController {
             @RequestParam(defaultValue = "0")   int    page,
             @RequestParam(defaultValue = "15")  int    size,
             @RequestParam(defaultValue = "updatedAt") String sortBy,
-            @RequestParam(defaultValue = "desc")      String sortDir) {
+            @RequestParam(defaultValue = "desc")      String sortDir,
+            @RequestHeader(value = "X-User-Name", required = false) String userName) {
         return ResponseEntity.ok(ApiResponse.ok("Entries fetched",
                 service.getAll(search, status, approval, projectName, raisedBy,
-                        dateFrom, dateTo, page, size, sortBy, sortDir)));
+                        dateFrom, dateTo, page, size, sortBy, sortDir, userName)));
     }
 
     @GetMapping("/entries/my")
@@ -132,13 +133,15 @@ public class PwjEntryController {
 
     /** GET /api/v1/pwj/budget-summary — Aggregated expense totals per project: PO→material, WO→subcontract, JO→labour */
     @GetMapping("/budget-summary")
-    public ResponseEntity<ApiResponse<Map<String, Map<String, Double>>>> getBudgetSummary() {
-        return ResponseEntity.ok(ApiResponse.ok("Budget summary", service.getBudgetSummary()));
+    public ResponseEntity<ApiResponse<Map<String, Map<String, Double>>>> getBudgetSummary(
+            @RequestHeader(value = "X-User-Name", required = false) String userName) {
+        return ResponseEntity.ok(ApiResponse.ok("Budget summary", service.getBudgetSummary(userName)));
     }
 
     @GetMapping("/pending-approvals")
-    public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingApprovals() {
-        return ResponseEntity.ok(ApiResponse.ok("Pending approvals", service.getPendingApprovals()));
+    public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingApprovals(
+            @RequestHeader(value = "X-User-Name", required = false) String userName) {
+        return ResponseEntity.ok(ApiResponse.ok("Pending approvals", service.getPendingApprovals(userName)));
     }
 
     /** PATCH /api/v1/pwj/entries/{id}/submit-doc — Admin/Procurement: submit doc for VP approval */
@@ -176,8 +179,9 @@ public class PwjEntryController {
 
     /** GET /api/v1/pwj/pending-doc-approvals — VP: list all docs awaiting approval */
     @GetMapping("/pending-doc-approvals")
-    public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingDocApprovals() {
-        return ResponseEntity.ok(ApiResponse.ok("Pending document approvals", service.getPendingDocApprovals()));
+    public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingDocApprovals(
+            @RequestHeader(value = "X-User-Name", required = false) String userName) {
+        return ResponseEntity.ok(ApiResponse.ok("Pending document approvals", service.getPendingDocApprovals(userName)));
     }
 
     /** PATCH /api/v1/pwj/entries/{id}/toggle-vendor-email — VP/Admin: toggle vendor email on/off */

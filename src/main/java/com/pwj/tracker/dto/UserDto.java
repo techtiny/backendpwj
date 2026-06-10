@@ -22,6 +22,7 @@ public class UserDto {
         public String fullName;
         public AppUser.Role role;
         public String token;
+        public Boolean isTestAccount;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor

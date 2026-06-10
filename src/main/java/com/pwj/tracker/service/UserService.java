@@ -54,6 +54,7 @@ public class UserService {
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .token(token)
+                .isTestAccount(Boolean.TRUE.equals(user.getIsTestAccount()))
                 .build();
     }
 

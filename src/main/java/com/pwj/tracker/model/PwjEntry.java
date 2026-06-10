@@ -144,6 +144,12 @@ public class PwjEntry {
     @Column(name = "vendor_email_enabled", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private Boolean vendorEmailEnabled = false;
 
+    // ── Test data isolation: entries created by a test login are flagged
+    // and excluded from real users' views (and vice versa) ────────────────
+    @Builder.Default
+    @Column(name = "is_test_data", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    private Boolean isTestData = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

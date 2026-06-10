@@ -43,6 +43,10 @@ public class AppUser {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
+    @Builder.Default
+    @Column(name = "is_test_account", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    private Boolean isTestAccount = false;
+
     @Column(name = "session_token", length = 64)
     private String sessionToken;
 

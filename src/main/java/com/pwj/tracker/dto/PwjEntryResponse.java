@@ -49,6 +49,7 @@ public class PwjEntryResponse {
     private PwjEntry.DocStatus docStatus;
     private String docComments;
     private String siteRemarks;
+    private Boolean isTestData;
     private String docData;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

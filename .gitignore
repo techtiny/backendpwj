@@ -3,3 +3,5 @@ target/
 *.log
 src/.DS_Store
 src/main/.DS_Store
+uploads/
+.github/

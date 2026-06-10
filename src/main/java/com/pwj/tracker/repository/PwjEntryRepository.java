@@ -30,6 +30,7 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
         AND (:raisedBy    IS NULL OR :raisedBy    = '' OR LOWER(e.raisedBy)    = LOWER(:raisedBy))
         AND (:dateFrom    IS NULL OR e.timestamp  >= :dateFrom)
         AND (:dateTo      IS NULL OR e.timestamp  <= :dateTo)
+        AND e.isTestData = :isTestData
     """)
     Page<PwjEntry> findFiltered(
         @Param("search")      String search,
@@ -39,30 +40,32 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
         @Param("raisedBy")    String raisedBy,
         @Param("dateFrom")    LocalDateTime dateFrom,
         @Param("dateTo")      LocalDateTime dateTo,
+        @Param("isTestData")  Boolean isTestData,
         Pageable pageable
     );
 
-    long countByStatus(PwjEntry.EntryStatus status);
-    long countByApprovalStatus(PwjEntry.ApprovalStatus approvalStatus);
+    long countByStatusAndIsTestData(PwjEntry.EntryStatus status, Boolean isTestData);
+    long countByApprovalStatusAndIsTestData(PwjEntry.ApprovalStatus approvalStatus, Boolean isTestData);
 
-    @Query("SELECT COUNT(e) FROM PwjEntry e WHERE e.status = :status AND LOWER(e.raisedBy) = LOWER(:raisedBy)")
-    long countByStatusAndRaisedBy(@Param("status") PwjEntry.EntryStatus status, @Param("raisedBy") String raisedBy);
+    @Query("SELECT COUNT(e) FROM PwjEntry e WHERE e.status = :status AND LOWER(e.raisedBy) = LOWER(:raisedBy) AND e.isTestData = :isTestData")
+    long countByStatusAndRaisedBy(@Param("status") PwjEntry.EntryStatus status, @Param("raisedBy") String raisedBy, @Param("isTestData") Boolean isTestData);
 
-    @Query("SELECT COUNT(e) FROM PwjEntry e WHERE e.approvalStatus = :approval AND LOWER(e.raisedBy) = LOWER(:raisedBy)")
-    long countByApprovalStatusAndRaisedBy(@Param("approval") PwjEntry.ApprovalStatus approval, @Param("raisedBy") String raisedBy);
+    @Query("SELECT COUNT(e) FROM PwjEntry e WHERE e.approvalStatus = :approval AND LOWER(e.raisedBy) = LOWER(:raisedBy) AND e.isTestData = :isTestData")
+    long countByApprovalStatusAndRaisedBy(@Param("approval") PwjEntry.ApprovalStatus approval, @Param("raisedBy") String raisedBy, @Param("isTestData") Boolean isTestData);
 
     @Query("SELECT DISTINCT e.projectName FROM PwjEntry e ORDER BY e.projectName")
     List<String> findDistinctProjectNames();
 
-    List<PwjEntry> findByApprovalStatusInAndStatus(
+    List<PwjEntry> findByApprovalStatusInAndStatusAndIsTestData(
             List<PwjEntry.ApprovalStatus> statuses,
-            PwjEntry.EntryStatus status
+            PwjEntry.EntryStatus status,
+            Boolean isTestData
     );
 
-    List<PwjEntry> findByDocStatus(PwjEntry.DocStatus docStatus);
+    List<PwjEntry> findByDocStatusAndIsTestData(PwjEntry.DocStatus docStatus, Boolean isTestData);
 
-    @Query("SELECT e FROM PwjEntry e WHERE e.docNumber IS NOT NULL ORDER BY e.updatedAt DESC")
-    List<PwjEntry> findAllWithDocData();
+    @Query("SELECT e FROM PwjEntry e WHERE e.docNumber IS NOT NULL AND e.isTestData = :isTestData ORDER BY e.updatedAt DESC")
+    List<PwjEntry> findAllWithDocData(@Param("isTestData") Boolean isTestData);
 
     @Modifying
     @Query("UPDATE PwjEntry e SET e.dependency = 'OH Approval' WHERE e.dependency IS NULL OR e.dependency = ''")

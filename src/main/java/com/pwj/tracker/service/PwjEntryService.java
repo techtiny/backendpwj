@@ -53,11 +53,20 @@ public class PwjEntryService {
     @Value("${pwj.newentry.email.to}")
     private String newEntryEmailTo;
 
+    // ── Resolve whether a (raisedBy / X-User-Name) identity is a test login ─
+    public boolean resolveIsTestAccount(String userName) {
+        if (userName == null || userName.isBlank()) return false;
+        return userRepository.findByFullNameAndActiveTrue(userName)
+                .or(() -> userRepository.findByUsernameAndActiveTrue(userName))
+                .map(u -> Boolean.TRUE.equals(u.getIsTestAccount()))
+                .orElse(false);
+    }
+
     // ── Admin/Procurement: see all entries with filters ──────────────────
     public PagedResponse<PwjEntryResponse> getAll(
             String search, String status, String approval, String projectName, String raisedBy,
             String dateFrom, String dateTo,
-            int page, int size, String sortBy, String sortDir) {
+            int page, int size, String sortBy, String sortDir, String userName) {
 
         PwjEntry.EntryStatus    statusEnum   = parseEnum(PwjEntry.EntryStatus.class,    status);
         PwjEntry.ApprovalStatus approvalEnum = parseEnum(PwjEntry.ApprovalStatus.class, approval);
@@ -70,14 +79,15 @@ public class PwjEntryService {
         String        raisedByFilter = (raisedBy == null || raisedBy.isBlank()) ? null : raisedBy;
         LocalDateTime from           = parseDate(dateFrom, false);
         LocalDateTime to             = parseDate(dateTo,   true);
+        boolean       isTestData     = resolveIsTestAccount(userName);
 
         Page<PwjEntry> pageResult = repository.findFiltered(
                 (search == null || search.isBlank()) ? null : search,
                 statusEnum, approvalEnum,
                 (projectName == null || projectName.isBlank()) ? null : projectName,
-                raisedByFilter, from, to, pageable);
+                raisedByFilter, from, to, isTestData, pageable);
 
-        return buildPagedResponse(pageResult, page, size, raisedByFilter);
+        return buildPagedResponse(pageResult, page, size, raisedByFilter, isTestData);
     }
 
     // ── Engineer: only their own entries, with full filter/search support ─
@@ -93,12 +103,13 @@ public class PwjEntryService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(primary, Sort.Order.desc("id")));
         LocalDateTime from = parseDate(dateFrom, false);
         LocalDateTime to   = parseDate(dateTo,   true);
+        boolean isTestData = resolveIsTestAccount(raisedBy);
         Page<PwjEntry> pageResult = repository.findFiltered(
                 (search == null || search.isBlank()) ? null : search,
                 statusEnum, approvalEnum,
                 (projectName == null || projectName.isBlank()) ? null : projectName,
-                raisedBy, from, to, pageable);
-        return buildPagedResponse(pageResult, page, size, raisedBy);
+                raisedBy, from, to, isTestData, pageable);
+        return buildPagedResponse(pageResult, page, size, raisedBy, isTestData);
     }
 
     // ── Get single entry ─────────────────────────────────────────────────
@@ -133,6 +144,7 @@ public class PwjEntryService {
                 .status(PwjEntry.EntryStatus.OPEN)
                 .remarks(req.getRemarks())
                 .dependency("OH Approval")
+                .isTestData(resolveIsTestAccount(req.getRaisedBy()))
                 .build();
         PwjEntryResponse saved = saveAndBroadcast(entry);
         // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendNewEntryNotification(saved));
@@ -301,6 +313,7 @@ public class PwjEntryService {
                         .status(PwjEntry.EntryStatus.OPEN)
                         .dependency("VP Approval")
                         .docData(docData)
+                        .isTestData(parent.getIsTestData())
                         .build();
 
                 PwjEntry saved = repository.save(child);
@@ -328,18 +341,22 @@ public class PwjEntryService {
         return repository.findDistinctProjectNames();
     }
 
-    public List<PwjEntryResponse> getPendingApprovals() {
-        return repository.findByApprovalStatusInAndStatus(
+    public List<PwjEntryResponse> getPendingApprovals(String userName) {
+        return repository.findByApprovalStatusInAndStatusAndIsTestData(
                         List.of(PwjEntry.ApprovalStatus.HOLD, PwjEntry.ApprovalStatus.NOT_APPROVED),
-                        PwjEntry.EntryStatus.OPEN)
+                        PwjEntry.EntryStatus.OPEN, resolveIsTestAccount(userName))
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     // ── Doc summary for Account Expenses picker ───────────────────────────
     public List<Map<String, Object>> getDocSummaries() {
+        return getDocSummaries(false);
+    }
+
+    public List<Map<String, Object>> getDocSummaries(boolean isTestData) {
         ObjectMapper mapper = new ObjectMapper();
         List<Map<String, Object>> result = new ArrayList<>();
-        for (PwjEntry e : repository.findAllWithDocData()) {
+        for (PwjEntry e : repository.findAllWithDocData(isTestData)) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("docNumber",        e.getDocNumber());
             m.put("pwjType",          e.getPwjType());
@@ -372,9 +389,9 @@ public class PwjEntryService {
         return result;
     }
 
-    public Map<String, Map<String, Double>> getBudgetSummary() {
+    public Map<String, Map<String, Double>> getBudgetSummary(String userName) {
         Map<String, Map<String, Double>> result = new LinkedHashMap<>();
-        for (Map<String, Object> doc : getDocSummaries()) {
+        for (Map<String, Object> doc : getDocSummaries(resolveIsTestAccount(userName))) {
             String pName = doc.get("projectName") instanceof String
                     ? ((String) doc.get("projectName")).trim() : null;
             String pType = doc.get("pwjType") instanceof String
@@ -479,8 +496,8 @@ public class PwjEntryService {
     }
 
     // ── VP: list all entries pending document approval ────────────────────
-    public List<PwjEntryResponse> getPendingDocApprovals() {
-        return repository.findByDocStatus(PwjEntry.DocStatus.PENDING_VP_APPROVAL)
+    public List<PwjEntryResponse> getPendingDocApprovals(String userName) {
+        return repository.findByDocStatusAndIsTestData(PwjEntry.DocStatus.PENDING_VP_APPROVAL, resolveIsTestAccount(userName))
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -758,11 +775,7 @@ public class PwjEntryService {
         return r;
     }
 
-    private PagedResponse<PwjEntryResponse> buildPagedResponse(Page<PwjEntry> p, int page, int size) {
-        return buildPagedResponse(p, page, size, null);
-    }
-
-    private PagedResponse<PwjEntryResponse> buildPagedResponse(Page<PwjEntry> p, int page, int size, String raisedBy) {
+    private PagedResponse<PwjEntryResponse> buildPagedResponse(Page<PwjEntry> p, int page, int size, String raisedBy, boolean isTestData) {
         boolean scoped = raisedBy != null && !raisedBy.isBlank();
         return PagedResponse.<PwjEntryResponse>builder()
                 .content(p.getContent().stream().map(this::toResponse).collect(Collectors.toList()))
@@ -770,20 +783,20 @@ public class PwjEntryService {
                 .totalElements(p.getTotalElements()).totalPages(p.getTotalPages())
                 .first(p.isFirst()).last(p.isLast())
                 .totalClosed(scoped
-                        ? repository.countByStatusAndRaisedBy(PwjEntry.EntryStatus.CLOSED, raisedBy)
-                        : repository.countByStatus(PwjEntry.EntryStatus.CLOSED))
+                        ? repository.countByStatusAndRaisedBy(PwjEntry.EntryStatus.CLOSED, raisedBy, isTestData)
+                        : repository.countByStatusAndIsTestData(PwjEntry.EntryStatus.CLOSED, isTestData))
                 .totalOpen(scoped
-                        ? repository.countByStatusAndRaisedBy(PwjEntry.EntryStatus.OPEN, raisedBy)
-                        : repository.countByStatus(PwjEntry.EntryStatus.OPEN))
+                        ? repository.countByStatusAndRaisedBy(PwjEntry.EntryStatus.OPEN, raisedBy, isTestData)
+                        : repository.countByStatusAndIsTestData(PwjEntry.EntryStatus.OPEN, isTestData))
                 .totalProceed(scoped
-                        ? repository.countByApprovalStatusAndRaisedBy(PwjEntry.ApprovalStatus.PROCEED, raisedBy)
-                        : repository.countByApprovalStatus(PwjEntry.ApprovalStatus.PROCEED))
+                        ? repository.countByApprovalStatusAndRaisedBy(PwjEntry.ApprovalStatus.PROCEED, raisedBy, isTestData)
+                        : repository.countByApprovalStatusAndIsTestData(PwjEntry.ApprovalStatus.PROCEED, isTestData))
                 .totalHold(scoped
-                        ? repository.countByApprovalStatusAndRaisedBy(PwjEntry.ApprovalStatus.HOLD, raisedBy)
-                        : repository.countByApprovalStatus(PwjEntry.ApprovalStatus.HOLD))
+                        ? repository.countByApprovalStatusAndRaisedBy(PwjEntry.ApprovalStatus.HOLD, raisedBy, isTestData)
+                        : repository.countByApprovalStatusAndIsTestData(PwjEntry.ApprovalStatus.HOLD, isTestData))
                 .totalNotApproved(scoped
-                        ? repository.countByApprovalStatusAndRaisedBy(PwjEntry.ApprovalStatus.NOT_APPROVED, raisedBy)
-                        : repository.countByApprovalStatus(PwjEntry.ApprovalStatus.NOT_APPROVED))
+                        ? repository.countByApprovalStatusAndRaisedBy(PwjEntry.ApprovalStatus.NOT_APPROVED, raisedBy, isTestData)
+                        : repository.countByApprovalStatusAndIsTestData(PwjEntry.ApprovalStatus.NOT_APPROVED, isTestData))
                 .build();
     }
 
@@ -808,6 +821,7 @@ public class PwjEntryService {
                 .docNumber(e.getDocNumber()).docStatus(e.getDocStatus())
                 .docComments(e.getDocComments())
                 .siteRemarks(e.getSiteRemarks())
+                .isTestData(Boolean.TRUE.equals(e.getIsTestData()))
                 .docData(e.getDocData())
                 .dependency(e.getDependency())
                 .ack(Boolean.TRUE.equals(e.getAck()))
