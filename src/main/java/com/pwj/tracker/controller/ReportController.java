@@ -5,16 +5,20 @@ import com.pwj.tracker.service.BackupService;
 import com.pwj.tracker.service.ExcelExportService;
 import com.pwj.tracker.service.WeeklyReportService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/report")
 @RequiredArgsConstructor
@@ -45,19 +49,22 @@ public class ReportController {
         }
     }
 
-    /** GET /download-backup — download full backup ZIP directly */
+    /** GET /download-backup — stream full backup ZIP directly (low memory, avoids gateway timeouts) */
     @GetMapping("/download-backup")
-    public ResponseEntity<byte[]> downloadBackup() {
-        try {
-            byte[] zipBytes = backupService.generateFullBackupZip();
-            String filename = "PWJ-FullBackup-" + LocalDate.now(IST) + ".zip";
-            return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.parseMediaType("application/zip"))
-                .body(zipBytes);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).build();
-        }
+    public ResponseEntity<StreamingResponseBody> downloadBackup() {
+        String filename = "PWJ-FullBackup-" + LocalDate.now(IST) + ".zip";
+        StreamingResponseBody body = out -> {
+            try {
+                backupService.writeFullBackupZip(out);
+            } catch (Exception e) {
+                log.error("Backup download failed", e);
+                throw new IOException("Backup generation failed: " + e.getMessage(), e);
+            }
+        };
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .contentType(MediaType.parseMediaType("application/zip"))
+            .body(body);
     }
 
     /** GET /download — download Excel report only */

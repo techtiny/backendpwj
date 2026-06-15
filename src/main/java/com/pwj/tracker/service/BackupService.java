@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Stream;
 import java.util.zip.*;
 
 @Slf4j
@@ -65,10 +66,17 @@ public class BackupService {
 
     // ── Full ZIP backup (SQL + Excel + uploads + metadata) ───────────────────
     public byte[] generateFullBackupZip() throws Exception {
-        String dateSuffix = LocalDate.now(IST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        writeFullBackupZip(baos);
+        return baos.toByteArray();
+    }
 
-        try (ZipOutputStream zip = new ZipOutputStream(baos)) {
+    /** Streams the full backup ZIP directly to the given output stream — avoids
+     *  buffering the whole archive (DB dump + uploads) in memory at once. */
+    public void writeFullBackupZip(OutputStream out) throws Exception {
+        String dateSuffix = LocalDate.now(IST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        try (ZipOutputStream zip = new ZipOutputStream(out)) {
             zip.setLevel(Deflater.BEST_COMPRESSION);
 
             // 1. Metadata JSON
@@ -78,9 +86,10 @@ public class BackupService {
             );
             addEntry(zip, "metadata.json", meta.getBytes(StandardCharsets.UTF_8));
 
-            // 2. SQL database dump (all tables — full restore capability)
-            byte[] sql = generateDatabaseDump();
-            addEntry(zip, "database/PWJ-DB-" + dateSuffix + ".sql", sql);
+            // 2. SQL database dump (all tables — full restore capability), streamed directly
+            zip.putNextEntry(new ZipEntry("database/PWJ-DB-" + dateSuffix + ".sql"));
+            writeDatabaseDump(zip);
+            zip.closeEntry();
 
             // 3. Excel export (human-readable data)
             try {
@@ -90,25 +99,25 @@ public class BackupService {
                 log.warn("Excel export skipped: {}", e.getMessage());
             }
 
-            // 4. All uploaded files (images + documents)
+            // 4. All uploaded files (images + documents), streamed file by file
             Path uploadsPath = Paths.get(uploadDir).toAbsolutePath();
             if (Files.exists(uploadsPath)) {
-                Files.walk(uploadsPath)
-                     .filter(Files::isRegularFile)
-                     .forEach(file -> {
-                         String rel = uploadsPath.relativize(file).toString().replace("\\", "/");
-                         try {
-                             addEntry(zip, "uploads/" + rel, Files.readAllBytes(file));
-                         } catch (IOException ex) {
-                             log.warn("Skipped file {}: {}", rel, ex.getMessage());
-                         }
-                     });
+                try (Stream<Path> files = Files.walk(uploadsPath)) {
+                    for (Path file : (Iterable<Path>) files.filter(Files::isRegularFile)::iterator) {
+                        String rel = uploadsPath.relativize(file).toString().replace("\\", "/");
+                        try {
+                            zip.putNextEntry(new ZipEntry("uploads/" + rel));
+                            Files.copy(file, zip);
+                            zip.closeEntry();
+                        } catch (IOException ex) {
+                            log.warn("Skipped file {}: {}", rel, ex.getMessage());
+                        }
+                    }
+                }
             } else {
                 log.info("No uploads directory found at {}", uploadsPath);
             }
         }
-
-        return baos.toByteArray();
     }
 
     private void addEntry(ZipOutputStream zip, String name, byte[] data) throws IOException {
@@ -201,10 +210,9 @@ public class BackupService {
         }
     }
 
-    // ── JDBC SQL dump ─────────────────────────────────────────────────────────
-    private byte[] generateDatabaseDump() throws Exception {
-        StringWriter sw = new StringWriter();
-        PrintWriter pw  = new PrintWriter(sw);
+    // ── JDBC SQL dump — streamed directly to the given (zip entry) stream ──────
+    private void writeDatabaseDump(OutputStream out) throws Exception {
+        PrintWriter pw = new PrintWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8));
 
         try (Connection conn = dataSource.getConnection()) {
             String catalog = conn.getCatalog();
@@ -276,7 +284,6 @@ public class BackupService {
         }
 
         pw.flush();
-        return sw.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     // ── Email ─────────────────────────────────────────────────────────────────
