@@ -74,10 +74,9 @@ public class BugReportService {
             bug.setAssignedTo(null);
             bug.setAssignedToName(null);
         } else {
-            AppUser user = userRepo.findByUsernameAndActiveTrue(assignedTo)
-                    .orElseThrow(() -> new RuntimeException("User not found: " + assignedTo));
+            // Assigned To is a free-text team label (e.g. "Happizo" / "Techtiny"), not an AppUser
             bug.setAssignedTo(assignedTo);
-            bug.setAssignedToName(user.getFullName());
+            bug.setAssignedToName(assignedTo);
         }
         return repo.save(bug);
     }
