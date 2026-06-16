@@ -69,6 +69,7 @@ public class VendorService {
         Vendor vendor = vendorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Vendor not found: " + id));
         vendor.setStatus(Vendor.VendorStatus.APPROVED);
+        vendor.setActive(true);
         return vendorRepository.save(vendor);
     }
 
