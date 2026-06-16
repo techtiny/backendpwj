@@ -72,12 +72,18 @@ public class BugReportService {
 
     @Transactional
     public BugReport updateStatus(Long id, String status, String actorUsername) {
+        AppUser actor = userRepo.findByUsernameAndActiveTrue(actorUsername)
+                .orElseThrow(() -> new RuntimeException("User not found: " + actorUsername));
+        if (actor.getRole() != AppUser.Role.ADMIN && actor.getRole() != AppUser.Role.VP
+                && actor.getRole() != AppUser.Role.OH && actor.getRole() != AppUser.Role.CEO) {
+            throw new RuntimeException("Only Admin, VP, OH or CEO can update bug status");
+        }
         BugReport bug = repo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Bug not found"));
         String oldStatus = bug.getStatus();
         bug.setStatus(status);
         BugReport saved = repo.save(bug);
-        String authorName = getFullName(actorUsername);
+        String authorName = actor.getFullName();
         logComment(id, "STATUS_CHANGE",
                 "Status changed from " + oldStatus + " → " + status + " by " + authorName,
                 actorUsername, authorName);
