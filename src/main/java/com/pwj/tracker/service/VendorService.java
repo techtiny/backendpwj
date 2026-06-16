@@ -43,9 +43,9 @@ public class VendorService {
     private static final String ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
     private static final String CLAUDE_MODEL      = "claude-opus-4-6";
 
-    // ── Get all active approved vendors ────────────────────────────────
+    // ── Get all active vendors for PO/WO/JO assignment dropdown ────────
     public List<Vendor> getVendors() {
-        return vendorRepository.findByActiveTrueAndStatusOrderByNameAsc(Vendor.VendorStatus.APPROVED);
+        return vendorRepository.findByActiveTrueOrderByNameAsc();
     }
 
     // ── Get all pending vendors ─────────────────────────────────────────
