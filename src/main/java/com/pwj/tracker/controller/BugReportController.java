@@ -1,6 +1,7 @@
 package com.pwj.tracker.controller;
 
 import com.pwj.tracker.dto.ApiResponse;
+import com.pwj.tracker.model.BugComment;
 import com.pwj.tracker.model.BugReport;
 import com.pwj.tracker.service.BugReportService;
 import lombok.RequiredArgsConstructor;
@@ -38,25 +39,45 @@ public class BugReportController {
         return ResponseEntity.ok(ApiResponse.ok("Bugs", bugs));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<BugReport>> update(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Bug updated",
+                service.update(id, body.get("title"), body.get("description"),
+                        body.get("module"), body.get("severity"), body.get("actorUsername"))));
+    }
+
     @PutMapping("/{id}/status")
     public ResponseEntity<ApiResponse<BugReport>> updateStatus(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(ApiResponse.ok("Status updated",
-                service.updateStatus(id, body.get("status"))));
+                service.updateStatus(id, body.get("status"), body.get("actorUsername"))));
     }
 
     @PutMapping("/{id}/severity")
     public ResponseEntity<ApiResponse<BugReport>> updateSeverity(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(ApiResponse.ok("Severity updated",
-                service.updateSeverity(id, body.get("severity"))));
+                service.updateSeverity(id, body.get("severity"), body.get("actorUsername"))));
     }
 
     @PutMapping("/{id}/assign")
     public ResponseEntity<ApiResponse<BugReport>> assign(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(ApiResponse.ok("Assigned",
-                service.assign(id, body.get("assignedTo"))));
+                service.assign(id, body.get("assignedTo"), body.get("actorUsername"))));
+    }
+
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<ApiResponse<List<BugComment>>> getComments(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Comments", service.getComments(id)));
+    }
+
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<ApiResponse<BugComment>> addComment(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Comment added",
+                service.addComment(id, body.get("commentText"), body.get("actorUsername"))));
     }
 
     @DeleteMapping("/{id}")
