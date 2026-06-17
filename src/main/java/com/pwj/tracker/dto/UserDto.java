@@ -21,6 +21,7 @@ public class UserDto {
         public String username;
         public String fullName;
         public AppUser.Role role;
+        public String designation;
         public String token;
         public Boolean isTestAccount;
     }
@@ -48,6 +49,7 @@ public class UserDto {
         public String fullName;
         public String email;
         public String phone;
+        public String designation;
         public AppUser.Role role;
         public Boolean active;
         public LocalDateTime createdAt;

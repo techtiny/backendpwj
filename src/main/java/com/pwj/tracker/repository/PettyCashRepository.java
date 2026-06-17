@@ -22,4 +22,9 @@ public interface PettyCashRepository extends JpaRepository<PettyCash, Long> {
 
     @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.status = :status")
     long countByUsernameAndStatus(String username, String status);
+
+    boolean existsByUsernameAndProjectNameAndStatus(String username, String projectName, String status);
+
+    @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.projectName = :projectName AND p.status NOT IN ('PROOF_SUBMITTED', 'REJECTED')")
+    long countActiveRequestsForProject(String username, String projectName);
 }

@@ -69,6 +69,19 @@ public class PettyCash {
     @Column(name = "attachment_url", length = 500)
     private String attachmentUrl;
 
+    @Column(name = "cash_transferred_at")
+    private LocalDateTime cashTransferredAt;
+
+    @Column(name = "proof_url", length = 500)
+    private String proofUrl;
+
+    // JSON array of proof URLs for multi-document support
+    @Column(name = "proof_urls", columnDefinition = "TEXT")
+    private String proofUrls;
+
+    @Column(name = "proof_submitted_at")
+    private LocalDateTime proofSubmittedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

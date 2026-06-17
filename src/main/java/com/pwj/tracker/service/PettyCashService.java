@@ -30,6 +30,11 @@ public class PettyCashService {
         AppUser user = userRepo.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
+        if (projectName != null && !projectName.isBlank()
+                && repo.countActiveRequestsForProject(username, projectName) > 0) {
+            throw new RuntimeException("ACTIVE_REQUEST_EXISTS:" + projectName);
+        }
+
         return repo.save(PettyCash.builder()
                 .username(username)
                 .fullName(user.getFullName())
@@ -81,6 +86,38 @@ public class PettyCashService {
         entry.setApprovedByRole(approvedByRole);
         entry.setApprovalComment(comment);
         entry.setApprovedAt(LocalDateTime.now());
+        return repo.save(entry);
+    }
+
+    @Transactional
+    public PettyCash markTransferred(Long id) {
+        PettyCash entry = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (!"APPROVED".equals(entry.getStatus()))
+            throw new RuntimeException("Entry is not approved");
+        entry.setStatus("CASH_TRANSFERRED");
+        entry.setCashTransferredAt(LocalDateTime.now());
+        return repo.save(entry);
+    }
+
+    @Transactional
+    public PettyCash submitProof(Long id, String username, java.util.List<String> proofUrlList) {
+        PettyCash entry = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (!entry.getUsername().equals(username))
+            throw new RuntimeException("Unauthorized");
+        if (!"CASH_TRANSFERRED".equals(entry.getStatus()))
+            throw new RuntimeException("Cash not yet transferred for this entry");
+        if (proofUrlList == null || proofUrlList.isEmpty())
+            throw new RuntimeException("At least one proof document is required");
+        entry.setStatus("PROOF_SUBMITTED");
+        entry.setProofUrl(proofUrlList.get(0));
+        try {
+            entry.setProofUrls(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(proofUrlList));
+        } catch (Exception e) {
+            entry.setProofUrls("[\"" + proofUrlList.get(0) + "\"]");
+        }
+        entry.setProofSubmittedAt(LocalDateTime.now());
         return repo.save(entry);
     }
 

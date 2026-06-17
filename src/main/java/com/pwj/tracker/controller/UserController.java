@@ -58,6 +58,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok("Phone updated", userService.updatePhone(id, body.get("phone"))));
     }
 
+    /** PATCH /api/v1/users/{id}/designation — Admin: set user designation */
+    @PatchMapping("/{id}/designation")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> updateDesignation(
+            @PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Designation updated", userService.updateDesignation(id, body.get("designation"))));
+    }
+
     /** PATCH /api/v1/users/{id}/password — Admin: change user password */
     @PatchMapping("/{id}/password")
     public ResponseEntity<ApiResponse<UserDto.UserResponse>> changePassword(

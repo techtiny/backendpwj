@@ -53,6 +53,7 @@ public class UserService {
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .role(user.getRole())
+                .designation(user.getDesignation())
                 .token(token)
                 .isTestAccount(Boolean.TRUE.equals(user.getIsTestAccount()))
                 .build();
@@ -134,6 +135,15 @@ public class UserService {
         return toResponse(userRepository.save(user));
     }
 
+    // ── Update designation ──
+    @Transactional
+    public UserDto.UserResponse updateDesignation(Long id, String designation) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setDesignation(designation == null || designation.isBlank() ? null : designation.trim());
+        return toResponse(userRepository.save(user));
+    }
+
     // ── Change password (Admin only) ──
     @Transactional
     public UserDto.UserResponse changePassword(Long id, String newPassword) {
@@ -166,7 +176,7 @@ public class UserService {
         return UserDto.UserResponse.builder()
                 .id(u.getId()).username(u.getUsername())
                 .fullName(u.getFullName()).email(u.getEmail())
-                .phone(u.getPhone())
+                .phone(u.getPhone()).designation(u.getDesignation())
                 .role(u.getRole()).active(u.getActive())
                 .createdAt(u.getCreatedAt()).build();
     }

@@ -65,6 +65,21 @@ public class PettyCashController {
                 service.reject(id, body.get("approvedBy"), body.get("approvedByRole"), body.getOrDefault("comment", ""))));
     }
 
+    @PutMapping("/{id}/mark-transferred")
+    public ResponseEntity<ApiResponse<PettyCash>> markTransferred(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Cash marked as transferred", service.markTransferred(id)));
+    }
+
+    @PutMapping("/{id}/submit-proof")
+    public ResponseEntity<ApiResponse<PettyCash>> submitProof(
+            @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String username = (String) body.get("username");
+        @SuppressWarnings("unchecked")
+        java.util.List<String> proofUrls = (java.util.List<String>) body.get("proofUrls");
+        return ResponseEntity.ok(ApiResponse.ok("Proof submitted",
+                service.submitProof(id, username, proofUrls)));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable Long id, @RequestParam String username) {

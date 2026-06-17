@@ -36,6 +36,9 @@ public class AppUser {
     @Column(name = "phone", length = 20)
     private String phone;
 
+    @Column(name = "designation", length = 150)
+    private String designation;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 30)
     private Role role;
