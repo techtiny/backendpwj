@@ -9,12 +9,17 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import java.util.TimeZone;
+
 @Slf4j
 @SpringBootApplication
 @EnableScheduling
 @EnableAsync
 public class PwjTrackerApplication {
     public static void main(String[] args) {
+        // Force UTC so LocalDateTime.now() always captures UTC regardless of server locale.
+        // Frontend converts UTC → IST for display.
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         SpringApplication.run(PwjTrackerApplication.class, args);
     }
 
