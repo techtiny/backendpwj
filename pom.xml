@@ -87,7 +87,6 @@
             <artifactId>openhtmltopdf-pdfbox</artifactId>
             <version>1.0.10</version>
             <exclusions>
-                <!-- openhtmltopdf pulls logback 1.2.x which conflicts with Spring Boot 3.2's logback 1.4.x -->
                 <exclusion>
                     <groupId>ch.qos.logback</groupId>
                     <artifactId>logback-classic</artifactId>
@@ -95,6 +94,12 @@
                 <exclusion>
                     <groupId>ch.qos.logback</groupId>
                     <artifactId>logback-core</artifactId>
+                </exclusion>
+                <!-- pdfbox brings commons-logging-1.2 which conflicts with Spring Boot 3.x spring-jcl;
+                     having both on the classpath corrupts logback's class loading (NoClassDefFoundError: ThrowableProxy) -->
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
