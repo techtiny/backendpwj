@@ -23,7 +23,8 @@ public class LeaveRequestService {
 
     @Transactional
     public LeaveRequest apply(String username, String leaveType, LocalDate fromDate,
-                              LocalDate toDate, String reason, String attachmentUrl) {
+                              LocalDate toDate, String reason, String attachmentUrl,
+                              Integer permissionHours) {
         AppUser user = userRepository.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         if (user.getRole() == AppUser.Role.VP ||
@@ -31,9 +32,17 @@ public class LeaveRequestService {
             user.getRole() == AppUser.Role.OH) {
             throw new RuntimeException("VP, CEO and OH roles are not permitted to apply for leave");
         }
-        if (fromDate.isAfter(toDate)) throw new RuntimeException("From date must be before to date");
 
-        int days = (int) ChronoUnit.DAYS.between(fromDate, toDate) + 1;
+        int days;
+        if ("PERMISSION".equals(leaveType)) {
+            // Permission: single date, hours-based — fromDate and toDate are the same
+            toDate = fromDate;
+            days = 0;
+        } else {
+            if (fromDate.isAfter(toDate)) throw new RuntimeException("From date must be before to date");
+            days = (int) ChronoUnit.DAYS.between(fromDate, toDate) + 1;
+        }
+
         LeaveRequest req = LeaveRequest.builder()
                 .username(username)
                 .fullName(user.getFullName())
@@ -43,6 +52,7 @@ public class LeaveRequestService {
                 .totalDays(days)
                 .reason(reason)
                 .attachmentUrl(attachmentUrl)
+                .permissionHours(permissionHours)
                 .status("PENDING")
                 .build();
         return leaveRepository.save(req);

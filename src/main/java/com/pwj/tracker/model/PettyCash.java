@@ -82,6 +82,16 @@ public class PettyCash {
     @Column(name = "proof_submitted_at")
     private LocalDateTime proofSubmittedAt;
 
+    /** Set when Admin tallies and verifies the submitted proof */
+    @Column(name = "proof_verified_at")
+    private LocalDateTime proofVerifiedAt;
+
+    @Column(name = "proof_verified_by", length = 100)
+    private String proofVerifiedBy;
+
+    @Column(name = "tally_comment", length = 500)
+    private String tallyComment;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

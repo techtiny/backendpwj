@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -72,6 +73,21 @@ public class AttendanceController {
     @GetMapping("/summary/{username}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getSummary(@PathVariable String username) {
         return ResponseEntity.ok(ApiResponse.ok("Summary", service.getSummary(username)));
+    }
+
+    /** GET /api/v1/hr/attendance/incomplete — admin: past records with missing check-out, auto-marked ABSENT */
+    @GetMapping("/incomplete")
+    public ResponseEntity<ApiResponse<List<Attendance>>> getIncomplete() {
+        return ResponseEntity.ok(ApiResponse.ok("Incomplete records", service.getIncompleteRecords()));
+    }
+
+    /** PATCH /api/v1/hr/attendance/{id} — admin correction of checkIn/checkOut times */
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<Attendance>> updateRecord(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        LocalDateTime checkInTime  = body.get("checkInTime")  != null ? LocalDateTime.parse((String) body.get("checkInTime"))  : null;
+        LocalDateTime checkOutTime = body.get("checkOutTime") != null ? LocalDateTime.parse((String) body.get("checkOutTime")) : null;
+        String notes = body.get("notes") != null ? (String) body.get("notes") : null;
+        return ResponseEntity.ok(ApiResponse.ok("Updated", service.updateAttendance(id, checkInTime, checkOutTime, notes)));
     }
 
     @ExceptionHandler(RuntimeException.class)

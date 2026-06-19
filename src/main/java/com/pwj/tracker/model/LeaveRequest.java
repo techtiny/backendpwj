@@ -26,7 +26,7 @@ public class LeaveRequest {
     @Column(nullable = false)
     private String fullName;
 
-    // CASUAL, SICK, EARNED, COMP_OFF, OTHER
+    // CASUAL, SICK, EARNED, COMP_OFF, PERMISSION, OTHER
     @Column(name = "leave_type", nullable = false, length = 20)
     private String leaveType;
 
@@ -38,6 +38,10 @@ public class LeaveRequest {
 
     @Column(name = "total_days")
     private Integer totalDays;
+
+    /** Hours requested — only set when leaveType = PERMISSION */
+    @Column(name = "permission_hours")
+    private Integer permissionHours;
 
     @Column(length = 1000)
     private String reason;

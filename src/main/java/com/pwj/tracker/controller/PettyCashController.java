@@ -80,6 +80,20 @@ public class PettyCashController {
                 service.submitProof(id, username, proofUrls)));
     }
 
+    /** GET /api/v1/hr/petty-cash/proof-review — all entries awaiting Admin tally */
+    @GetMapping("/proof-review")
+    public ResponseEntity<ApiResponse<List<PettyCash>>> getProofPendingReview() {
+        return ResponseEntity.ok(ApiResponse.ok("Proof pending review", service.getProofPendingReview()));
+    }
+
+    /** PUT /api/v1/hr/petty-cash/{id}/verify-proof — Admin tallies and verifies proof */
+    @PutMapping("/{id}/verify-proof")
+    public ResponseEntity<ApiResponse<PettyCash>> verifyProof(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Proof verified and tallied",
+                service.verifyProof(id, body.get("verifiedBy"), body.getOrDefault("tallyComment", ""))));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable Long id, @RequestParam String username) {

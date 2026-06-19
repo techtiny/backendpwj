@@ -21,14 +21,17 @@ public class LeaveController {
     /** POST /api/v1/hr/leave */
     @PostMapping
     public ResponseEntity<ApiResponse<LeaveRequest>> apply(@RequestBody Map<String, String> body) {
+        Integer permissionHours = body.get("permissionHours") != null
+                ? Integer.parseInt(body.get("permissionHours")) : null;
         return ResponseEntity.ok(ApiResponse.ok("Leave applied",
                 service.apply(
                         body.get("username"),
                         body.get("leaveType"),
                         LocalDate.parse(body.get("fromDate")),
-                        LocalDate.parse(body.get("toDate")),
+                        body.get("toDate") != null ? LocalDate.parse(body.get("toDate")) : LocalDate.parse(body.get("fromDate")),
                         body.get("reason"),
-                        body.get("attachmentUrl")
+                        body.get("attachmentUrl"),
+                        permissionHours
                 )));
     }
 

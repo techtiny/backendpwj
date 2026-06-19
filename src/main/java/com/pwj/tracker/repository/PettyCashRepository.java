@@ -25,6 +25,11 @@ public interface PettyCashRepository extends JpaRepository<PettyCash, Long> {
 
     boolean existsByUsernameAndProjectNameAndStatus(String username, String projectName, String status);
 
-    @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.projectName = :projectName AND p.status NOT IN ('PROOF_SUBMITTED', 'REJECTED')")
+    /** Returns count of requests that block a new submission — PROOF_SUBMITTED is now included until Admin verifies */
+    @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.projectName = :projectName AND p.status NOT IN ('PROOF_VERIFIED', 'REJECTED')")
     long countActiveRequestsForProject(String username, String projectName);
+
+    /** All entries awaiting Admin proof review */
+    @Query("SELECT p FROM PettyCash p WHERE p.status = 'PROOF_SUBMITTED' ORDER BY p.proofSubmittedAt ASC")
+    List<PettyCash> findProofSubmittedEntries();
 }

@@ -121,6 +121,24 @@ public class PettyCashService {
         return repo.save(entry);
     }
 
+    /** Admin: tally the submitted proof and mark as PROOF_VERIFIED so engineer can raise next request. */
+    @Transactional
+    public PettyCash verifyProof(Long id, String verifiedBy, String tallyComment) {
+        PettyCash entry = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (!"PROOF_SUBMITTED".equals(entry.getStatus()))
+            throw new RuntimeException("Entry does not have submitted proof to verify");
+        entry.setStatus("PROOF_VERIFIED");
+        entry.setProofVerifiedAt(LocalDateTime.now());
+        entry.setProofVerifiedBy(verifiedBy);
+        if (tallyComment != null && !tallyComment.isBlank()) entry.setTallyComment(tallyComment);
+        return repo.save(entry);
+    }
+
+    public List<PettyCash> getProofPendingReview() {
+        return repo.findProofSubmittedEntries();
+    }
+
     @Transactional
     public void delete(Long id, String username) {
         PettyCash entry = repo.findById(id)

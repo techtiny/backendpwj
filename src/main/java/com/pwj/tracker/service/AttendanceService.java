@@ -94,6 +94,36 @@ public class AttendanceService {
         return attendanceRepository.findByUsernameInOrderByWorkDateDescCheckInTimeDesc(usernames);
     }
 
+    /** Mark past-day records with no check-out as ABSENT, then return them for review. */
+    @Transactional
+    public List<Attendance> getIncompleteRecords() {
+        LocalDate today = LocalDate.now(IST);
+        List<Attendance> incomplete = attendanceRepository.findIncompleteBeforeDate(today);
+        for (Attendance a : incomplete) {
+            if (!"ABSENT".equals(a.getStatus())) {
+                a.setStatus("ABSENT");
+                attendanceRepository.save(a);
+            }
+        }
+        return incomplete;
+    }
+
+    /** Admin correction: update checkIn/checkOut times and recalculate duration/status. */
+    @Transactional
+    public Attendance updateAttendance(Long id, LocalDateTime checkInTime, LocalDateTime checkOutTime, String notes) {
+        Attendance att = attendanceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Attendance record not found: " + id));
+        if (checkInTime  != null) att.setCheckInTime(checkInTime);
+        if (checkOutTime != null) att.setCheckOutTime(checkOutTime);
+        if (notes        != null) att.setNotes(notes);
+        if (att.getCheckInTime() != null && att.getCheckOutTime() != null) {
+            long minutes = java.time.Duration.between(att.getCheckInTime(), att.getCheckOutTime()).toMinutes();
+            att.setTotalMinutes((int) minutes);
+            att.setStatus(minutes >= 240 ? "PRESENT" : "HALF_DAY");
+        }
+        return attendanceRepository.save(att);
+    }
+
     public Map<String, Object> getSummary(String username) {
         LocalDate monthStart = LocalDate.now(IST).withDayOfMonth(1);
         long presentDays = attendanceRepository.countByUsernameAndStatusSince(username, "PRESENT", monthStart);

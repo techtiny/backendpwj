@@ -31,4 +31,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     long countByUsernameSince(String username, LocalDate from);
 
     List<Attendance> findByUsernameInOrderByWorkDateDescCheckInTimeDesc(List<String> usernames);
+
+    /** Records from past days where employee checked in but never checked out */
+    @Query("SELECT a FROM Attendance a WHERE a.checkOutTime IS NULL AND a.workDate < :today ORDER BY a.workDate DESC, a.fullName ASC")
+    List<Attendance> findIncompleteBeforeDate(@Param("today") LocalDate today);
 }
