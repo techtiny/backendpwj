@@ -40,4 +40,6 @@ public class ProjectRequest {
 
     // For reactivation
     private Boolean active;
+
+    private Boolean eligibleForAccounts;
 }

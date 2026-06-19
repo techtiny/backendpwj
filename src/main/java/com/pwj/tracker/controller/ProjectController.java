@@ -39,6 +39,11 @@ public class ProjectController {
         return ApiResponse.ok("Active projects fetched", projectRepository.findByActiveTrueOrderByNameAsc());
     }
 
+    @GetMapping("/eligible-for-accounts")
+    public ApiResponse<List<Project>> getEligibleForAccounts() {
+        return ApiResponse.ok("Eligible projects fetched", projectRepository.findByActiveTrueAndEligibleForAccountsTrueOrderByNameAsc());
+    }
+
     /** Returns distinct clients (name + gstNo + address) from existing projects for autocomplete */
     @GetMapping("/clients")
     public ApiResponse<List<Map<String, String>>> getClients() {
@@ -145,7 +150,8 @@ public class ProjectController {
         if (req.getPoWoDocUrl()          != null) project.setPoWoDocUrl(req.getPoWoDocUrl());
         if (req.getAmendedPoWoStatus()   != null) project.setAmendedPoWoStatus(req.getAmendedPoWoStatus());
         if (req.getAmendedPoWoDocUrl()   != null) project.setAmendedPoWoDocUrl(req.getAmendedPoWoDocUrl());
-        if (req.getActive()              != null) project.setActive(req.getActive());
+        if (req.getActive()                  != null) project.setActive(req.getActive());
+        if (req.getEligibleForAccounts()     != null) project.setEligibleForAccounts(req.getEligibleForAccounts());
 
         return ApiResponse.ok("Project updated", projectRepository.save(project));
     }

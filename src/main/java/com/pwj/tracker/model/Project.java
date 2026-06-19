@@ -107,6 +107,10 @@ public class Project {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
+    @Builder.Default
+    @Column(name = "eligible_for_accounts", nullable = false)
+    private Boolean eligibleForAccounts = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

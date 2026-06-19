@@ -70,6 +70,12 @@ public class DependencyMigrationRunner implements ApplicationRunner {
             jdbcTemplate.execute("ALTER TABLE hr_petty_cash ADD COLUMN proof_urls TEXT");
         } catch (Exception e) { /* already exists */ }
 
+        // Step 6: add eligible_for_accounts flag to project table
+        try {
+            jdbcTemplate.execute("ALTER TABLE project ADD COLUMN eligible_for_accounts BOOLEAN NOT NULL DEFAULT FALSE");
+            log.info("eligible_for_accounts column created in project");
+        } catch (Exception e) { /* already exists */ }
+
         for (java.util.Map.Entry<String, String> e : designations.entrySet()) {
             try {
                 int rows = jdbcTemplate.update(
