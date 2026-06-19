@@ -108,7 +108,7 @@ public class Project {
     private Boolean active = true;
 
     @Builder.Default
-    @Column(name = "eligible_for_accounts", nullable = false)
+    @Column(name = "eligible_for_accounts", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean eligibleForAccounts = false;
 
     @CreationTimestamp

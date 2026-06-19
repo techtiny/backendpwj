@@ -71,7 +71,7 @@ public class FundTransferService {
 
     public List<Map<String, Object>> getAllProjects() {
         List<Map<String, Object>> result = new ArrayList<>();
-        projectRepo.findByActiveTrueOrderByNameAsc().forEach(p -> {
+        projectRepo.findByActiveTrueAndEligibleForAccountsTrueOrderByNameAsc().forEach(p -> {
             BigDecimal available = availableBalance(p.getId());
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id",               p.getId());

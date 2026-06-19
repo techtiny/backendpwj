@@ -22,4 +22,7 @@ public interface ProjectCollectionRepository extends JpaRepository<ProjectCollec
 
     @Query("SELECT COALESCE(SUM(c.collectedAmt), 0) FROM ProjectCollection c WHERE c.projectId = :projectId")
     BigDecimal sumCollectedByProject(@Param("projectId") Long projectId);
+
+    @Query("SELECT c.projectId, COALESCE(SUM(c.collectedAmt), 0) FROM ProjectCollection c GROUP BY c.projectId")
+    List<Object[]> sumCollectedGroupedByProject();
 }

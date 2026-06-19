@@ -29,7 +29,7 @@ public class DashboardService {
     }
 
     public DashboardStatsDto getStats() {
-        List<Project> projects = projectRepo.findAll();
+        List<Project> projects = projectRepo.findByActiveTrueAndEligibleForAccountsTrueOrderByNameAsc();
 
         BigDecimal totalQuote = projects.stream()
                 .map(p -> p.getTotalValue() != null ? p.getTotalValue() : BigDecimal.ZERO)

@@ -406,14 +406,17 @@ public class PwjEntryService {
             if (pName == null || pType == null) continue;
             double gross = doc.get("gross") instanceof Number
                     ? ((Number) doc.get("gross")).doubleValue() : 0;
+            double gst = doc.get("gstAmount") instanceof Number
+                    ? ((Number) doc.get("gstAmount")).doubleValue() : 0;
             String cat = switch (pType.toUpperCase()) {
                 case "PO" -> "material";
                 case "WO" -> "subcontract";
                 case "JO" -> "labour";
                 default   -> "miscellaneous";
             };
-            result.computeIfAbsent(pName, k -> new LinkedHashMap<>())
-                  .merge(cat, gross, Double::sum);
+            Map<String, Double> proj = result.computeIfAbsent(pName, k -> new LinkedHashMap<>());
+            proj.merge(cat, gross, Double::sum);
+            proj.merge("gst", gst, Double::sum);
         }
         return result;
     }

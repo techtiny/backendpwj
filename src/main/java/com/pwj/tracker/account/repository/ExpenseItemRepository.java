@@ -55,4 +55,7 @@ public interface ExpenseItemRepository extends JpaRepository<ExpenseItem, Long> 
         GROUP BY e.projectId
         """)
     List<Object[]> getExpenseBreakdownByProject();
+
+    @Query("SELECT e.projectId, COALESCE(SUM(e.vendorGstAmount), 0) FROM ExpenseItem e GROUP BY e.projectId")
+    List<Object[]> getTotalVendorGstByProject();
 }

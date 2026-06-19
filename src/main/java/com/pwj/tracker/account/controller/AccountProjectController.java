@@ -1,6 +1,7 @@
 package com.pwj.tracker.account.controller;
 
 import com.pwj.tracker.account.repository.ExpenseItemRepository;
+import com.pwj.tracker.account.repository.ProjectCollectionRepository;
 import com.pwj.tracker.model.Project;
 import com.pwj.tracker.repository.ProjectRepository;
 import org.springframework.http.ResponseEntity;
@@ -18,13 +19,16 @@ public class AccountProjectController {
 
     private final ProjectRepository projectRepo;
     private final ExpenseItemRepository expenseRepo;
+    private final ProjectCollectionRepository collectionRepo;
 
     private static final List<String> CATEGORIES =
             List.of("MATERIAL", "SUBCONTRACT", "CONSULTANTS", "LABOUR", "MISCELLANEOUS");
 
-    public AccountProjectController(ProjectRepository projectRepo, ExpenseItemRepository expenseRepo) {
-        this.projectRepo = projectRepo;
-        this.expenseRepo = expenseRepo;
+    public AccountProjectController(ProjectRepository projectRepo, ExpenseItemRepository expenseRepo,
+                                    ProjectCollectionRepository collectionRepo) {
+        this.projectRepo    = projectRepo;
+        this.expenseRepo    = expenseRepo;
+        this.collectionRepo = collectionRepo;
     }
 
     @GetMapping
@@ -71,11 +75,17 @@ public class AccountProjectController {
             totPwj = totPwj.add(pwj); totPaid = totPaid.add(paid); totVendor = totVendor.add(vendor);
         }
 
+        BigDecimal quoteGross         = proj.getTotalValue() != null ? proj.getTotalValue() : BigDecimal.ZERO;
+        BigDecimal collectionReceived = collectionRepo.sumCollectedByProject(id);
+        BigDecimal balanceAsOnDate    = quoteGross.subtract(collectionReceived);
+
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("projectName",  proj.getName());
-        result.put("client",       proj.getClientName());
-        result.put("quoteGross",   proj.getTotalValue() != null ? proj.getTotalValue() : BigDecimal.ZERO);
-        result.put("categories",   rows);
+        result.put("projectName",        proj.getName());
+        result.put("client",             proj.getClientName());
+        result.put("quoteGross",         quoteGross);
+        result.put("collectionReceived", collectionReceived);
+        result.put("balanceAsOnDate",    balanceAsOnDate);
+        result.put("categories",         rows);
         result.put("totals", Map.of(
             "pwjTotal",      totPwj,
             "actualPaid",    totPaid,
