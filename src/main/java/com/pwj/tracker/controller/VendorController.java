@@ -53,6 +53,13 @@ public class VendorController {
         return ResponseEntity.ok(ApiResponse.ok("Vendor rejected", rejected));
     }
 
+    /** PUT /api/v1/vendors/{id}/resubmit — Procurement / Admin: send an edited vendor back for VP approval */
+    @PutMapping("/{id}/resubmit")
+    public ResponseEntity<ApiResponse<Vendor>> resubmitVendor(@PathVariable Long id) {
+        Vendor resubmitted = vendorService.resubmitVendor(id);
+        return ResponseEntity.ok(ApiResponse.ok("Vendor sent for approval", resubmitted));
+    }
+
     /** POST /api/v1/vendors — Procurement / Admin: add new vendor */
     @PostMapping
     public ResponseEntity<ApiResponse<Vendor>> createVendor(

@@ -83,6 +83,16 @@ public class VendorService {
         return vendorRepository.save(vendor);
     }
 
+    // ── Resubmit vendor for VP approval (e.g. after editing a rejected vendor) ─
+    @Transactional
+    public Vendor resubmitVendor(Long id) {
+        Vendor vendor = vendorRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Vendor not found: " + id));
+        vendor.setStatus(Vendor.VendorStatus.PENDING_APPROVAL);
+        vendor.setActive(true);
+        return vendorRepository.save(vendor);
+    }
+
     // ── Create vendor ───────────────────────────────────────────────────
     @Transactional
     public Vendor createVendor(VendorRequest req) {
