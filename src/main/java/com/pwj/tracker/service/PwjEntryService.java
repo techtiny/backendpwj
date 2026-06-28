@@ -47,6 +47,9 @@ public class PwjEntryService {
     private final JavaMailSender     mailSender;
     private final com.pwj.tracker.config.SseBroadcaster sseBroadcaster;
 
+    private static final List<String> DEPENDENCY_NAMES = List.of(
+            "OH Approval", "VP Approval", "Procurement", "Site team", "Vendor", "DIP");
+
     @Value("${pwj.report.email.from}")
     private String mailFrom;
 
@@ -65,6 +68,7 @@ public class PwjEntryService {
     // ── Admin/Procurement: see all entries with filters ──────────────────
     public PagedResponse<PwjEntryResponse> getAll(
             String search, String status, String approval, String projectName, String raisedBy,
+            String dependency,
             String dateFrom, String dateTo,
             int page, int size, String sortBy, String sortDir, String userName) {
 
@@ -77,6 +81,7 @@ public class PwjEntryService {
         Pageable pageable = PageRequest.of(page, size, sort);
 
         String        raisedByFilter = (raisedBy == null || raisedBy.isBlank()) ? null : raisedBy;
+        String        dependencyFilter = (dependency == null || dependency.isBlank()) ? null : dependency;
         LocalDateTime from           = parseDate(dateFrom, false);
         LocalDateTime to             = parseDate(dateTo,   true);
         boolean       isTestData     = resolveIsTestAccount(userName);
@@ -85,7 +90,7 @@ public class PwjEntryService {
                 (search == null || search.isBlank()) ? null : search,
                 statusEnum, approvalEnum,
                 (projectName == null || projectName.isBlank()) ? null : projectName,
-                raisedByFilter, from, to, isTestData, pageable);
+                raisedByFilter, dependencyFilter, from, to, isTestData, pageable);
 
         return buildPagedResponse(pageResult, page, size, raisedByFilter, isTestData);
     }
@@ -93,7 +98,7 @@ public class PwjEntryService {
     // ── Engineer: only their own entries, with full filter/search support ─
     public PagedResponse<PwjEntryResponse> getByEngineer(
             String raisedBy, String search, String status, String approval,
-            String projectName, String dateFrom, String dateTo,
+            String projectName, String dependency, String dateFrom, String dateTo,
             int page, int size, String sortBy, String sortDir) {
         PwjEntry.EntryStatus    statusEnum   = parseEnum(PwjEntry.EntryStatus.class,    status);
         PwjEntry.ApprovalStatus approvalEnum = parseEnum(PwjEntry.ApprovalStatus.class, approval);
@@ -101,6 +106,7 @@ public class PwjEntryService {
                 ? Sort.Order.asc(sortBy != null ? sortBy : "updatedAt")
                 : Sort.Order.desc(sortBy != null ? sortBy : "updatedAt");
         Pageable pageable = PageRequest.of(page, size, Sort.by(primary, Sort.Order.desc("id")));
+        String dependencyFilter = (dependency == null || dependency.isBlank()) ? null : dependency;
         LocalDateTime from = parseDate(dateFrom, false);
         LocalDateTime to   = parseDate(dateTo,   true);
         boolean isTestData = resolveIsTestAccount(raisedBy);
@@ -108,7 +114,7 @@ public class PwjEntryService {
                 (search == null || search.isBlank()) ? null : search,
                 statusEnum, approvalEnum,
                 (projectName == null || projectName.isBlank()) ? null : projectName,
-                raisedBy, from, to, isTestData, pageable);
+                raisedBy, dependencyFilter, from, to, isTestData, pageable);
         return buildPagedResponse(pageResult, page, size, raisedBy, isTestData);
     }
 
@@ -197,7 +203,13 @@ public class PwjEntryService {
             }
             entry.setVendor(req.getVendor());
         }
-        if (req.getPwjIssued()   != null) entry.setPwjIssued(req.getPwjIssued());
+        if (req.getPwjIssued()   != null) {
+            boolean wasIssued = Boolean.TRUE.equals(entry.getPwjIssued());
+            entry.setPwjIssued(req.getPwjIssued());
+            if (Boolean.TRUE.equals(req.getPwjIssued()) && !wasIssued) {
+                entry.setDependency("DIP");
+            }
+        }
         if (req.getStatus()      != null) entry.setStatus(req.getStatus());
         if (req.getDeliveredDate() != null) {
             entry.setDeliveredDate(req.getDeliveredDate());
@@ -460,7 +472,7 @@ public class PwjEntryService {
         PwjEntry entry = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
         entry.setDocStatus(PwjEntry.DocStatus.VP_APPROVED);
-        entry.setDependency("Procurement");
+        entry.setDependency("DIP");
         entry.setApprovedAt(LocalDateTime.now());
         if (comment != null && !comment.isBlank()) entry.setDocComments(comment.trim());
         return saveAndBroadcast(entry);
@@ -477,6 +489,7 @@ public class PwjEntryService {
         } else {
             entry.setDocStatus(PwjEntry.DocStatus.VP_REJECTED);
         }
+        entry.setDependency("Procurement");
         return saveAndBroadcast(entry);
     }
 
@@ -807,6 +820,12 @@ public class PwjEntryService {
                 .totalNotApproved(scoped
                         ? repository.countByApprovalStatusAndRaisedBy(PwjEntry.ApprovalStatus.NOT_APPROVED, raisedBy, isTestData)
                         : repository.countByApprovalStatusAndIsTestData(PwjEntry.ApprovalStatus.NOT_APPROVED, isTestData))
+                .dependencyCounts(DEPENDENCY_NAMES.stream().collect(Collectors.toMap(
+                        dep -> dep,
+                        dep -> scoped
+                                ? repository.countByDependencyAndStatusAndRaisedBy(dep, PwjEntry.EntryStatus.OPEN, raisedBy, isTestData)
+                                : repository.countByDependencyAndStatusAndIsTestData(dep, PwjEntry.EntryStatus.OPEN, isTestData),
+                        (a, b) -> a, LinkedHashMap::new)))
                 .build();
     }
 

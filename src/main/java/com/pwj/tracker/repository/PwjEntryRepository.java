@@ -28,6 +28,7 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
         AND (:approval    IS NULL OR e.approvalStatus = :approval)
         AND (:projectName IS NULL OR :projectName = '' OR LOWER(e.projectName) = LOWER(:projectName))
         AND (:raisedBy    IS NULL OR :raisedBy    = '' OR LOWER(e.raisedBy)    = LOWER(:raisedBy))
+        AND (:dependency  IS NULL OR :dependency  = '' OR e.dependency = :dependency)
         AND (:dateFrom    IS NULL OR e.timestamp  >= :dateFrom)
         AND (:dateTo      IS NULL OR e.timestamp  <= :dateTo)
         AND e.isTestData = :isTestData
@@ -38,6 +39,7 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
         @Param("approval")    PwjEntry.ApprovalStatus approval,
         @Param("projectName") String projectName,
         @Param("raisedBy")    String raisedBy,
+        @Param("dependency")  String dependency,
         @Param("dateFrom")    LocalDateTime dateFrom,
         @Param("dateTo")      LocalDateTime dateTo,
         @Param("isTestData")  Boolean isTestData,
@@ -52,6 +54,11 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
 
     @Query("SELECT COUNT(e) FROM PwjEntry e WHERE e.approvalStatus = :approval AND LOWER(e.raisedBy) = LOWER(:raisedBy) AND e.isTestData = :isTestData")
     long countByApprovalStatusAndRaisedBy(@Param("approval") PwjEntry.ApprovalStatus approval, @Param("raisedBy") String raisedBy, @Param("isTestData") Boolean isTestData);
+
+    long countByDependencyAndStatusAndIsTestData(String dependency, PwjEntry.EntryStatus status, Boolean isTestData);
+
+    @Query("SELECT COUNT(e) FROM PwjEntry e WHERE e.dependency = :dependency AND e.status = :status AND LOWER(e.raisedBy) = LOWER(:raisedBy) AND e.isTestData = :isTestData")
+    long countByDependencyAndStatusAndRaisedBy(@Param("dependency") String dependency, @Param("status") PwjEntry.EntryStatus status, @Param("raisedBy") String raisedBy, @Param("isTestData") Boolean isTestData);
 
     @Query("SELECT DISTINCT e.projectName FROM PwjEntry e ORDER BY e.projectName")
     List<String> findDistinctProjectNames();

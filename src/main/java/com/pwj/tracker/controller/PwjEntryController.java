@@ -37,6 +37,7 @@ public class PwjEntryController {
             @RequestParam(required = false)     String approval,
             @RequestParam(required = false)     String projectName,
             @RequestParam(required = false)     String raisedBy,
+            @RequestParam(required = false)     String dependency,
             @RequestParam(required = false)     String dateFrom,
             @RequestParam(required = false)     String dateTo,
             @RequestParam(defaultValue = "0")   int    page,
@@ -45,7 +46,7 @@ public class PwjEntryController {
             @RequestParam(defaultValue = "desc")      String sortDir,
             @RequestHeader(value = "X-User-Name", required = false) String userName) {
         return ResponseEntity.ok(ApiResponse.ok("Entries fetched",
-                service.getAll(search, status, approval, projectName, raisedBy,
+                service.getAll(search, status, approval, projectName, raisedBy, dependency,
                         dateFrom, dateTo, page, size, sortBy, sortDir, userName)));
     }
 
@@ -56,6 +57,7 @@ public class PwjEntryController {
             @RequestParam(required = false)              String status,
             @RequestParam(required = false)              String approval,
             @RequestParam(required = false)              String projectName,
+            @RequestParam(required = false)              String dependency,
             @RequestParam(required = false)              String dateFrom,
             @RequestParam(required = false)              String dateTo,
             @RequestParam(defaultValue = "0")            int    page,
@@ -64,7 +66,7 @@ public class PwjEntryController {
             @RequestParam(defaultValue = "desc")         String sortDir) {
         return ResponseEntity.ok(ApiResponse.ok("My entries fetched",
                 service.getByEngineer(raisedBy, search, status, approval,
-                        projectName, dateFrom, dateTo, page, size, sortBy, sortDir)));
+                        projectName, dependency, dateFrom, dateTo, page, size, sortBy, sortDir)));
     }
 
     @GetMapping("/entries/{id}")

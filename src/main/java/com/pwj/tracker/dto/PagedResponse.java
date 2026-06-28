@@ -2,6 +2,7 @@ package com.pwj.tracker.dto;
 
 import lombok.*;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -22,4 +23,5 @@ public class PagedResponse<T> {
     private Long totalProceed;
     private Long totalHold;
     private Long totalNotApproved;
+    private Map<String, Long> dependencyCounts;
 }
