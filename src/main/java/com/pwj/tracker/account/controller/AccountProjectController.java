@@ -4,6 +4,7 @@ import com.pwj.tracker.account.repository.ExpenseItemRepository;
 import com.pwj.tracker.account.repository.ProjectCollectionRepository;
 import com.pwj.tracker.model.Project;
 import com.pwj.tracker.repository.ProjectRepository;
+import com.pwj.tracker.service.PwjEntryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
@@ -20,15 +21,17 @@ public class AccountProjectController {
     private final ProjectRepository projectRepo;
     private final ExpenseItemRepository expenseRepo;
     private final ProjectCollectionRepository collectionRepo;
+    private final PwjEntryService pwjEntryService;
 
     private static final List<String> CATEGORIES =
             List.of("MATERIAL", "SUBCONTRACT", "CONSULTANTS", "LABOUR", "MISCELLANEOUS");
 
     public AccountProjectController(ProjectRepository projectRepo, ExpenseItemRepository expenseRepo,
-                                    ProjectCollectionRepository collectionRepo) {
-        this.projectRepo    = projectRepo;
-        this.expenseRepo    = expenseRepo;
-        this.collectionRepo = collectionRepo;
+                                    ProjectCollectionRepository collectionRepo, PwjEntryService pwjEntryService) {
+        this.projectRepo     = projectRepo;
+        this.expenseRepo     = expenseRepo;
+        this.collectionRepo  = collectionRepo;
+        this.pwjEntryService = pwjEntryService;
     }
 
     @GetMapping
@@ -77,22 +80,62 @@ public class AccountProjectController {
 
         BigDecimal quoteGross         = proj.getTotalValue() != null ? proj.getTotalValue() : BigDecimal.ZERO;
         BigDecimal collectionReceived = collectionRepo.sumCollectedByProject(id);
-        BigDecimal balanceAsOnDate    = quoteGross.subtract(collectionReceived);
+
+        BigDecimal balancePwj    = totPwj.subtract(totPaid);
+        BigDecimal balanceActual = totVendor.subtract(totPaid);
+
+        // Balance Due (top stat) = Work Order Value (Quote Gross) - Collection Received
+        BigDecimal balanceDue = quoteGross.subtract(collectionReceived);
+        // Balance as on Date (bottom banner) = Collection Received - Total Balance to be Paid (Actual)
+        BigDecimal balanceAsOnDate = collectionReceived.subtract(balanceActual);
+
+        // Total Expenses for the Project = Total Paid Expenses + Total Balance to be Paid (per column)
+        BigDecimal totalExpensesPwj    = totPwj.add(balancePwj);
+        BigDecimal totalExpensesActual = totPaid.add(balanceActual);
+
+        // GST: As per PO is not tracked at the document level — left blank.
+        // Actual GST uses the same formula as the Project-wise "Total GST" card:
+        // PWJ-doc GST (PO/WO/JO gstAmount) + vendor GST (expense_items.vendorGstAmount)
+        BigDecimal gstPwj = null;
+        BigDecimal vendorGst = BigDecimal.ZERO;
+        List<Object[]> gstRows = expenseRepo.getGstTotalsByProject(id);
+        if (!gstRows.isEmpty()) {
+            vendorGst = dec(gstRows.get(0)[1]);
+        }
+        BigDecimal pwjDocGst = BigDecimal.ZERO;
+        Map<String, Map<String, Double>> budgetSummary = pwjEntryService.getBudgetSummary(null);
+        for (Map.Entry<String, Map<String, Double>> e : budgetSummary.entrySet()) {
+            if (e.getKey() != null && e.getKey().trim().equalsIgnoreCase(proj.getName().trim())) {
+                Double gst = e.getValue().get("gst");
+                if (gst != null) pwjDocGst = BigDecimal.valueOf(gst);
+                break;
+            }
+        }
+        BigDecimal gstActual = pwjDocGst.add(vendorGst);
+
+        // Gross expenses for P&L = total expenses (actual), net of GST (GST is pass-through, not a real cost)
+        BigDecimal grossExpensesActual = totalExpensesActual.subtract(gstActual);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("projectName",        proj.getName());
-        result.put("client",             proj.getClientName());
-        result.put("quoteGross",         quoteGross);
-        result.put("collectionReceived", collectionReceived);
-        result.put("balanceAsOnDate",    balanceAsOnDate);
-        result.put("categories",         rows);
+        result.put("projectName",         proj.getName());
+        result.put("client",              proj.getClientName());
+        result.put("quoteGross",          quoteGross);
+        result.put("collectionReceived",  collectionReceived);
+        result.put("balanceDue",          balanceDue);
+        result.put("balanceAsOnDate",     balanceAsOnDate);
+        result.put("categories",          rows);
         result.put("totals", Map.of(
             "pwjTotal",      totPwj,
             "actualPaid",    totPaid,
             "vendorTotal",   totVendor,
-            "balancePwj",    totPwj.subtract(totPaid),
-            "balanceActual", totVendor.subtract(totPaid)
+            "balancePwj",    balancePwj,
+            "balanceActual", balanceActual
         ));
+        result.put("totalExpensesPwj",    totalExpensesPwj);
+        result.put("totalExpensesActual", totalExpensesActual);
+        result.put("gstPwj",              gstPwj);
+        result.put("gstActual",           gstActual);
+        result.put("grossExpensesActual", grossExpensesActual);
         return ResponseEntity.ok(result);
     }
 
