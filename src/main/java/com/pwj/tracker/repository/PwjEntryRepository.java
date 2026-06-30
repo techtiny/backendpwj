@@ -77,4 +77,8 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
     @Modifying
     @Query("UPDATE PwjEntry e SET e.dependency = 'OH Approval' WHERE e.dependency IS NULL OR e.dependency = ''")
     int backfillNullDependency();
+
+    @Modifying
+    @Query("UPDATE PwjEntry e SET e.projectName = :newName WHERE e.projectName = :oldName")
+    int renameProjectName(@Param("oldName") String oldName, @Param("newName") String newName);
 }

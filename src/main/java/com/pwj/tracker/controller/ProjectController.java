@@ -1,11 +1,14 @@
 package com.pwj.tracker.controller;
 
+import com.pwj.tracker.config.SseBroadcaster;
 import com.pwj.tracker.dto.ApiResponse;
 import com.pwj.tracker.dto.ProjectRequest;
 import com.pwj.tracker.model.Project;
 import com.pwj.tracker.repository.ProjectRepository;
+import com.pwj.tracker.repository.PwjEntryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -22,6 +25,8 @@ import java.util.stream.Collectors;
 public class ProjectController {
 
     private final ProjectRepository projectRepository;
+    private final PwjEntryRepository pwjEntryRepository;
+    private final SseBroadcaster sseBroadcaster;
 
     @GetMapping
     public ApiResponse<List<Project>> getAll() {
@@ -105,10 +110,12 @@ public class ProjectController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public ApiResponse<Project> update(@PathVariable Long id, @RequestBody ProjectRequest req) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Project not found: " + id));
 
+        String oldName = project.getName();
         if (req.getName() != null && !req.getName().isBlank())
             project.setName(req.getName().trim());
         if (req.getLocation()         != null) project.setLocation(req.getLocation());
@@ -153,7 +160,14 @@ public class ProjectController {
         if (req.getActive()                  != null) project.setActive(req.getActive());
         if (req.getEligibleForAccounts()     != null) project.setEligibleForAccounts(req.getEligibleForAccounts());
 
-        return ApiResponse.ok("Project updated", projectRepository.save(project));
+        Project saved = projectRepository.save(project);
+
+        if (!oldName.equals(saved.getName())) {
+            pwjEntryRepository.renameProjectName(oldName, saved.getName());
+            sseBroadcaster.broadcast();
+        }
+
+        return ApiResponse.ok("Project updated", saved);
     }
 
     @DeleteMapping("/{id}")
