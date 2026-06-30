@@ -30,8 +30,10 @@ public class PettyCashService {
         AppUser user = userRepo.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
+        // Up to 2 untallied requests may stay open per project at once; a 3rd
+        // requires the oldest of those to be tallied (PROOF_VERIFIED) first.
         if (projectName != null && !projectName.isBlank()
-                && repo.countActiveRequestsForProject(username, projectName) > 0) {
+                && repo.countActiveRequestsForProject(username, projectName) >= 2) {
             throw new RuntimeException("ACTIVE_REQUEST_EXISTS:" + projectName);
         }
 

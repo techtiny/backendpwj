@@ -25,7 +25,7 @@ public interface PettyCashRepository extends JpaRepository<PettyCash, Long> {
 
     boolean existsByUsernameAndProjectNameAndStatus(String username, String projectName, String status);
 
-    /** Returns count of requests that block a new submission — PROOF_SUBMITTED is now included until Admin verifies */
+    /** Count of untallied (non-REJECTED, non-PROOF_VERIFIED) requests for a project; a 3rd new request is blocked once this reaches 2 */
     @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.projectName = :projectName AND p.status NOT IN ('PROOF_VERIFIED', 'REJECTED')")
     long countActiveRequestsForProject(String username, String projectName);
 
