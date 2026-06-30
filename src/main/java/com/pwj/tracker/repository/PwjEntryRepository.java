@@ -18,12 +18,13 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
     @Query("""
         SELECT e FROM PwjEntry e
         WHERE (:search IS NULL OR :search = '' OR
-               LOWER(e.materialRequired) LIKE LOWER(CONCAT('%', :search, '%')) OR
-               LOWER(e.projectName)      LIKE LOWER(CONCAT('%', :search, '%')) OR
-               LOWER(e.raisedBy)         LIKE LOWER(CONCAT('%', :search, '%')) OR
-               LOWER(e.vendor)           LIKE LOWER(CONCAT('%', :search, '%')) OR
-               LOWER(e.boqNo)            LIKE LOWER(CONCAT('%', :search, '%')) OR
-               LOWER(e.docNumber)        LIKE LOWER(CONCAT('%', :search, '%')))
+               LOWER(e.materialRequired)  LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.projectName)       LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.raisedBy)          LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.vendor)            LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.boqNo)             LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.docNumber)         LIKE LOWER(CONCAT('%', :search, '%')) OR
+               CAST(e.id AS string)       LIKE CONCAT('%', :search, '%'))
         AND (:status      IS NULL OR e.status         = :status)
         AND (:approval    IS NULL OR e.approvalStatus = :approval)
         AND (:projectName IS NULL OR :projectName = '' OR LOWER(e.projectName) = LOWER(:projectName))
