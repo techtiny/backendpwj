@@ -509,6 +509,26 @@ public class PwjEntryService {
         return saveAndBroadcast(entry);
     }
 
+    // ── Admin/Procurement: delete doc and revert PR to pre-doc state ─────
+    @Transactional
+    public PwjEntryResponse deleteDoc(Long id) {
+        PwjEntry entry = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (entry.getDocNumber() == null && entry.getDocStatus() == null) {
+            throw new RuntimeException("No document exists on this entry");
+        }
+        entry.setDocNumber(null);
+        entry.setDocData(null);
+        entry.setDocStatus(null);
+        entry.setDocComments(null);
+        entry.setApprovedAt(null);
+        entry.setPwjIssued(false);
+        entry.setDeliveredDate(null);
+        entry.setStatus(PwjEntry.EntryStatus.OPEN);
+        entry.setDependency("Procurement");
+        return saveAndBroadcast(entry);
+    }
+
     // ── VP/Admin: toggle vendor email enabled ─────────────────────────────
     @Transactional
     public PwjEntryResponse toggleVendorEmail(Long id) {

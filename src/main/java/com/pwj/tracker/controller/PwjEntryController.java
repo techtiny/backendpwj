@@ -179,6 +179,12 @@ public class PwjEntryController {
         return ResponseEntity.ok(ApiResponse.ok("Document rejected", service.rejectDoc(id, comment)));
     }
 
+    /** DELETE /api/v1/pwj/entries/{id}/doc — Admin/Procurement: delete doc and revert PR to pre-doc state */
+    @DeleteMapping("/entries/{id}/doc")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> deleteDoc(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Document deleted — entry reverted to pre-doc state", service.deleteDoc(id)));
+    }
+
     /** GET /api/v1/pwj/pending-doc-approvals — VP: list all docs awaiting approval */
     @GetMapping("/pending-doc-approvals")
     public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingDocApprovals(
