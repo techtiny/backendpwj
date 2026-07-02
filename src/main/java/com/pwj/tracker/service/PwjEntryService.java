@@ -149,7 +149,7 @@ public class PwjEntryService {
                 .vendorEmailEnabled(false)
                 .status(PwjEntry.EntryStatus.OPEN)
                 .remarks(req.getRemarks())
-                .dependency("OH Approval")
+                .dependency("Procurement")
                 .isTestData(resolveIsTestAccount(req.getRaisedBy()))
                 .build();
         PwjEntryResponse saved = saveAndBroadcast(entry);
@@ -462,7 +462,7 @@ public class PwjEntryService {
             entry.setDocNumber(entry.getPwjType() + "-" + fy + "-" + String.format("%04d", id));
         }
         entry.setDocStatus(PwjEntry.DocStatus.PENDING_VP_APPROVAL);
-        entry.setDependency("VP Approval");
+        entry.setDependency("DIP");
         return saveAndBroadcast(entry);
     }
 
