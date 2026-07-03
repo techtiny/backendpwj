@@ -2,6 +2,7 @@ package com.pwj.tracker.dto;
 
 import com.pwj.tracker.model.PwjEntry;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -26,10 +27,14 @@ public class PwjEntryRequest {
     @NotBlank(message = "Material required is mandatory")
     private String materialRequired;
 
+    @NotBlank(message = "Specification is required")
     private String specification;
     private String brand;
+    @NotBlank(message = "Unit is required")
     private String unit;
+    @NotNull(message = "Quantity is required")
     private BigDecimal quantity;
+    @NotNull(message = "Date of requirement is required")
     private LocalDate dateOfRequirement;
     private String imageReference;
     private PwjEntry.ApprovalStatus approvalStatus;
