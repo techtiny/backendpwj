@@ -87,7 +87,7 @@ public class AttendanceService {
     }
 
     public List<Attendance> getFieldStaffAttendance() {
-        List<AppUser.Role> fieldRoles = List.of(AppUser.Role.ENGINEER, AppUser.Role.PROJECT_MANAGER);
+        List<AppUser.Role> fieldRoles = List.of(AppUser.Role.ENGINEER, AppUser.Role.PROJECT_MANAGER, AppUser.Role.ADMIN, AppUser.Role.PROCUREMENT);
         List<String> usernames = userRepository.findByRoleInAndActiveTrue(fieldRoles)
                 .stream().map(AppUser::getUsername).toList();
         if (usernames.isEmpty()) return List.of();
