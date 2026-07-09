@@ -132,7 +132,7 @@ public class PwjEntry {
     @PreUpdate
     void ensureDependency() {
         if (dependency == null || dependency.isBlank()) {
-            dependency = "Procurement";
+            dependency = "OH Approval";
         }
     }
 
