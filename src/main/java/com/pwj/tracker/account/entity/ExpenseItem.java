@@ -56,6 +56,31 @@ public class ExpenseItem {
     private String paidTo;
     private String remarks;
 
+    // Payment eligibility / send-for-payment workflow
+    @Column(nullable = false)
+    private Boolean eligibleForPayment = false;
+
+    @Column(nullable = false)
+    private String paymentStatus = "NOT_SENT"; // NOT_SENT, PART_PAYMENT_SENT, FULL_PAYMENT_SENT
+
+    // Cumulative amount sent via the Send-for-Payment workflow. Tracked separately from
+    // paidAmount so that Paid Amount / Balance to be paid / Paid To — all driven by
+    // paidAmount — are never touched by Send for Payment.
+    @Column(precision = 15, scale = 2)
+    private BigDecimal sentAmount = BigDecimal.ZERO;
+
+    // Timestamp of the most recent Send-for-Payment action — used only by the
+    // "Send for Payment" tracker's timeline filter, separate from paymentDate.
+    private java.time.LocalDateTime sentAt;
+
+    // Two-stage approval on the sent amount, independent of the Send-for-Payment
+    // workflow itself — OH reviews first (and may revise sentAmount), then VP.
+    @Column(nullable = false)
+    private String ohApprovalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+
+    @Column(nullable = false)
+    private String vpApprovalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+
     public ExpenseItem() {}
 
     public Long getId() { return id; }
@@ -98,4 +123,16 @@ public class ExpenseItem {
     public void setPaidTo(String paidTo) { this.paidTo = paidTo; }
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
+    public Boolean getEligibleForPayment() { return eligibleForPayment; }
+    public void setEligibleForPayment(Boolean eligibleForPayment) { this.eligibleForPayment = eligibleForPayment; }
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+    public BigDecimal getSentAmount() { return sentAmount; }
+    public void setSentAmount(BigDecimal sentAmount) { this.sentAmount = sentAmount; }
+    public java.time.LocalDateTime getSentAt() { return sentAt; }
+    public void setSentAt(java.time.LocalDateTime sentAt) { this.sentAt = sentAt; }
+    public String getOhApprovalStatus() { return ohApprovalStatus; }
+    public void setOhApprovalStatus(String ohApprovalStatus) { this.ohApprovalStatus = ohApprovalStatus; }
+    public String getVpApprovalStatus() { return vpApprovalStatus; }
+    public void setVpApprovalStatus(String vpApprovalStatus) { this.vpApprovalStatus = vpApprovalStatus; }
 }

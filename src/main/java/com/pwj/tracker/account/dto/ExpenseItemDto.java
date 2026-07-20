@@ -28,6 +28,15 @@ public class ExpenseItemDto {
     private String paidTo;
     private String remarks;
     private List<String> allowedCategories;
+    private Boolean eligibleForPayment;
+    private String paymentStatus;
+    private BigDecimal sentAmount;
+    private java.time.LocalDateTime sentAt;
+    private String ohApprovalStatus;
+    private String vpApprovalStatus;
+    private BigDecimal poValue;
+    private BigDecimal poBalanceRemaining;
+    private String projectName; // populated only by the cross-project "sent for payment" listing
 
     public ExpenseItemDto() {}
 
@@ -77,4 +86,22 @@ public class ExpenseItemDto {
     public void setRemarks(String remarks) { this.remarks = remarks; }
     public List<String> getAllowedCategories() { return allowedCategories; }
     public void setAllowedCategories(List<String> allowedCategories) { this.allowedCategories = allowedCategories; }
+    public Boolean getEligibleForPayment() { return eligibleForPayment; }
+    public void setEligibleForPayment(Boolean eligibleForPayment) { this.eligibleForPayment = eligibleForPayment; }
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+    public BigDecimal getSentAmount() { return sentAmount; }
+    public void setSentAmount(BigDecimal sentAmount) { this.sentAmount = sentAmount; }
+    public java.time.LocalDateTime getSentAt() { return sentAt; }
+    public void setSentAt(java.time.LocalDateTime sentAt) { this.sentAt = sentAt; }
+    public String getOhApprovalStatus() { return ohApprovalStatus; }
+    public void setOhApprovalStatus(String ohApprovalStatus) { this.ohApprovalStatus = ohApprovalStatus; }
+    public String getVpApprovalStatus() { return vpApprovalStatus; }
+    public void setVpApprovalStatus(String vpApprovalStatus) { this.vpApprovalStatus = vpApprovalStatus; }
+    public BigDecimal getPoValue() { return poValue; }
+    public void setPoValue(BigDecimal poValue) { this.poValue = poValue; }
+    public BigDecimal getPoBalanceRemaining() { return poBalanceRemaining; }
+    public void setPoBalanceRemaining(BigDecimal poBalanceRemaining) { this.poBalanceRemaining = poBalanceRemaining; }
+    public String getProjectName() { return projectName; }
+    public void setProjectName(String projectName) { this.projectName = projectName; }
 }

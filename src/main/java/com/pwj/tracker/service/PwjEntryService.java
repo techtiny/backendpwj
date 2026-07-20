@@ -503,6 +503,8 @@ public class PwjEntryService {
         }
         entry.setDocStatus(PwjEntry.DocStatus.REVOKED);
         entry.setApprovedAt(null);
+        entry.setPwjIssued(false);
+        entry.setDependency("Procurement");
         entry.setDocComments(reason != null && !reason.isBlank()
                 ? "[Approval Revoked by VP] " + reason.trim()
                 : "[Approval Revoked by VP]");

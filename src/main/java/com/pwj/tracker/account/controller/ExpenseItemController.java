@@ -1,12 +1,14 @@
 package com.pwj.tracker.account.controller;
 
 import com.pwj.tracker.account.dto.ExpenseItemDto;
+import com.pwj.tracker.account.dto.SendForPaymentRequest;
 import com.pwj.tracker.account.service.ExpenseItemService;
 import com.pwj.tracker.repository.ProjectRepository;
 import com.pwj.tracker.service.PwjEntryService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -82,6 +84,51 @@ public class ExpenseItemController {
     public ResponseEntity<ExpenseItemDto> moveCategory(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(service.moveCategory(id, body.get("category")));
+    }
+
+    /** PATCH /api/expenses/{id}/eligibility — body: { "eligible": true|false } */
+    @PatchMapping("/{id}/eligibility")
+    public ResponseEntity<ExpenseItemDto> setEligibility(
+            @PathVariable Long id, @RequestBody Map<String, Boolean> body) {
+        return ResponseEntity.ok(service.setEligibility(id, Boolean.TRUE.equals(body.get("eligible"))));
+    }
+
+    /**
+     * POST /api/expenses/send-for-payment
+     * Body: { "items": [{ "id": 1, "paymentType": "FULL" }, { "id": 2, "paymentType": "PART", "amount": 5000 }] }
+     * Sends the selected, already-eligible entries for payment. Atomic across the batch —
+     * validation includes the per-PO cap (total sent per refNo can't exceed its derived value).
+     */
+    @PostMapping("/send-for-payment")
+    public ResponseEntity<List<ExpenseItemDto>> sendForPayment(@RequestBody SendForPaymentRequest req) {
+        return ResponseEntity.ok(service.sendForPayment(req.getItems()));
+    }
+
+    /** GET /api/expenses/sent-for-payment — cross-project tracker of everything sent for payment */
+    @GetMapping("/sent-for-payment")
+    public ResponseEntity<List<ExpenseItemDto>> getSentForPayment() {
+        return ResponseEntity.ok(service.getSentForPayment());
+    }
+
+    /**
+     * PATCH /api/expenses/{id}/oh-approval
+     * Body: { "status": "APPROVED"|"REJECTED", "revisedAmount": 12345.00 }
+     * OH may revise the sent amount before approving/rejecting.
+     */
+    @PatchMapping("/{id}/oh-approval")
+    public ResponseEntity<ExpenseItemDto> setOhApproval(
+            @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String status = (String) body.get("status");
+        BigDecimal revisedAmount = body.get("revisedAmount") != null
+                ? new BigDecimal(body.get("revisedAmount").toString()) : null;
+        return ResponseEntity.ok(service.setOhApproval(id, status, revisedAmount));
+    }
+
+    /** PATCH /api/expenses/{id}/vp-approval — Body: { "status": "APPROVED"|"REJECTED" } */
+    @PatchMapping("/{id}/vp-approval")
+    public ResponseEntity<ExpenseItemDto> setVpApproval(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(service.setVpApproval(id, body.get("status")));
     }
 
     @PostMapping("/repair-categories")
