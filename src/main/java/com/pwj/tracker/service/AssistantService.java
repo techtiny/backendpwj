@@ -300,11 +300,11 @@ public class AssistantService {
         kb.add(new Entry(
                 new String[]{"unclub", "declub", "separate", "remove", "clubbed"},
                 new String[]{"unclub", "un-club", "un club", "remove from the club", "separate the items"},
-                "There's no separate \"unclub\" button — clubbing is controlled by how you regenerate the document:",
+                "To unclub a PR (Admin/Procurement only):",
                 new String[]{
-                        "Re-run the vendor-assignment/document-generation step with the items grouped differently",
-                        "Entries left out of the new grouping automatically have their old \"Clubs #...\" pointer cleared",
-                        "So excluding an item from a new grouping effectively un-clubs it"
+                        "Find the ✂️ Unclub button next to its \"📎 Clubs #...\" badge — either on the PR's own row, or next to each clubbed ID listed on the primary document's row",
+                        "Confirming pulls that PR back out as an independent entry, ready to be assigned to a vendor on its own",
+                        "This does not remove its line item from the primary document's PDF — open that document and edit the item rows too if you also want it off the paperwork"
                 }, null));
 
         kb.add(new Entry(

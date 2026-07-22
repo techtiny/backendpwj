@@ -46,6 +46,7 @@ public class PwjEntryRequest {
     private String remarks;
     private String docData;
     private String docNumber;
+    private PwjEntry.DocStatus docStatus;
     private String dependency;
     private Long projectId;
 }

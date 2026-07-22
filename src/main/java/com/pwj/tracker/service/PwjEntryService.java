@@ -187,6 +187,7 @@ public class PwjEntryService {
         entry.setRemarks(req.getRemarks());
         if (req.getDocData() != null) entry.setDocData(req.getDocData());
         if (req.getDocNumber() != null && !req.getDocNumber().isBlank()) entry.setDocNumber(req.getDocNumber());
+        if (req.getDocStatus() != null) entry.setDocStatus(req.getDocStatus());
         if (req.getDependency() != null && !req.getDependency().isBlank()) entry.setDependency(req.getDependency());
         return saveAndBroadcast(entry);
     }
