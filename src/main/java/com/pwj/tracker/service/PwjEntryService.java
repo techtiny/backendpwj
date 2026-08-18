@@ -499,8 +499,8 @@ public class PwjEntryService {
     public PwjEntryResponse revokeDoc(Long id, String reason) {
         PwjEntry entry = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
-        if (entry.getDocStatus() != PwjEntry.DocStatus.VP_APPROVED) {
-            throw new RuntimeException("Only VP_APPROVED documents can be revoked");
+        if (entry.getDocStatus() != PwjEntry.DocStatus.VP_APPROVED && !Boolean.TRUE.equals(entry.getPwjIssued())) {
+            throw new RuntimeException("Only VP_APPROVED or issued documents can be revoked");
         }
         entry.setDocStatus(PwjEntry.DocStatus.REVOKED);
         entry.setApprovedAt(null);
