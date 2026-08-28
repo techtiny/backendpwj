@@ -4,7 +4,11 @@ import com.pwj.tracker.account.dto.ExpenseItemDto;
 import com.pwj.tracker.account.dto.SendForPaymentRequest;
 import com.pwj.tracker.account.entity.ExpenseItem;
 import com.pwj.tracker.account.repository.ExpenseItemRepository;
+import com.pwj.tracker.dto.PwjEntryResponse;
+import com.pwj.tracker.model.Vendor;
 import com.pwj.tracker.repository.ProjectRepository;
+import com.pwj.tracker.repository.VendorRepository;
+import com.pwj.tracker.service.PwjEntryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -15,10 +19,15 @@ public class ExpenseItemService {
 
     private final ExpenseItemRepository repo;
     private final ProjectRepository projectRepo;
+    private final PwjEntryService pwjEntryService;
+    private final VendorRepository vendorRepo;
 
-    public ExpenseItemService(ExpenseItemRepository repo, ProjectRepository projectRepo) {
+    public ExpenseItemService(ExpenseItemRepository repo, ProjectRepository projectRepo,
+                               PwjEntryService pwjEntryService, VendorRepository vendorRepo) {
         this.repo = repo;
         this.projectRepo = projectRepo;
+        this.pwjEntryService = pwjEntryService;
+        this.vendorRepo = vendorRepo;
     }
 
     public List<ExpenseItemDto> getByProjectAndCategory(Long projectId, String category) {
@@ -195,21 +204,190 @@ public class ExpenseItemService {
         return results;
     }
 
+    /**
+     * Procurement: create and immediately send a payment request straight from an issued
+     * PWJ entry — vendor, doc number and project are derived from the entry itself, so the
+     * caller only supplies the amount. Reuses the same PO-value cap as the manual
+     * Send-for-Payment flow (grouped by refNo == the PWJ doc number).
+     */
+    @Transactional
+    public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount) {
+        return sendPwjEntryForPayment(pwjEntryId, amount, null);
+    }
+
+    @Transactional
+    public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero");
+        }
+        PwjEntryResponse entry = pwjEntryService.getById(pwjEntryId);
+        boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
+                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
+        if (!issued) {
+            throw new IllegalArgumentException("PWJ entry #" + pwjEntryId + " has not been issued yet");
+        }
+        if (entry.getDocNumber() == null || entry.getDocNumber().isBlank()) {
+            throw new IllegalArgumentException("PWJ entry #" + pwjEntryId + " has no document number");
+        }
+        if (entry.getProjectName() == null || entry.getProjectName().isBlank()) {
+            throw new IllegalArgumentException("PWJ entry #" + pwjEntryId + " has no project name");
+        }
+        // The Account module's projects are a separate list from the PWJ tracker's free-text
+        // project names — match by name the same way GET /expenses/pwj-docs?projectId= does in
+        // reverse. An issued PO whose project was never set up on the Account side can't be sent.
+        Long accountProjectId = projectRepo.findByNameIgnoreCase(entry.getProjectName().trim())
+                .map(com.pwj.tracker.model.Project::getId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No Account project named \"" + entry.getProjectName() + "\" — ask Accounts to set it up first"));
+
+        Map<String, Object> summary = pwjEntryService.getDocSummaries().stream()
+                .filter(d -> entry.getDocNumber().equals(d.get("docNumber")))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Could not resolve document totals for " + entry.getDocNumber()));
+
+        BigDecimal poValue = toBigDecimal(summary.get("totalPayable"));
+        BigDecimal gross    = toBigDecimal(summary.get("gross"));
+        BigDecimal gstPct   = toBigDecimal(summary.get("gstPct"));
+        BigDecimal gstAmt   = toBigDecimal(summary.get("gstAmount"));
+
+        BigDecimal alreadySentPo = repo.sumSentForPo(accountProjectId, entry.getDocNumber());
+        BigDecimal newTotalForPo = alreadySentPo.add(amount);
+        if (newTotalForPo.compareTo(poValue) > 0) {
+            throw new IllegalArgumentException(
+                    "Sending " + amount + " would exceed the PO value (" + poValue + ") for " +
+                    entry.getDocNumber() + " — already sent " + alreadySentPo);
+        }
+
+        ExpenseItem e = new ExpenseItem();
+        e.setProjectId(accountProjectId);
+        e.setCategory(defaultCategoryFor(entry.getPwjType()));
+        e.setDescription(entry.getMaterialRequired());
+        e.setPartyName(entry.getVendor());
+        e.setRefNo(entry.getDocNumber());
+        e.setPwjGross(gross);
+        e.setGstPercent(gstPct);
+        e.setPwjGstAmount(gstAmt);
+        e.setPwjTotalPayable(poValue);
+        e.setPaymentAgainst(entry.getPwjType());
+        e.setEligibleForPayment(true);
+        e.setSentAmount(amount);
+        e.setPaymentStatus(newTotalForPo.compareTo(poValue) >= 0 ? "FULL_PAYMENT_SENT" : "PART_PAYMENT_SENT");
+        e.setSentAt(java.time.LocalDateTime.now());
+        if (remarks != null && !remarks.isBlank()) e.setRemarks(remarks.trim());
+
+        ExpenseItemDto dto = toDto(repo.save(e));
+        dto.setProjectName(entry.getProjectName());
+        return dto;
+    }
+
+    /**
+     * Procurement: how much of an issued PWJ doc's value is still available to send for
+     * payment — poValue (the doc's total payable) minus everything already sent against
+     * that doc number. Mirrors the PO-value cap enforced by {@link #sendPwjEntryForPayment}.
+     * {@code resolved} is false when the doc totals or the Account-side project can't be
+     * matched, in which case {@code available} is 0 and the real check happens on submit.
+     */
+    public Map<String, Object> getPwjEntryPaymentAvailability(Long pwjEntryId) {
+        PwjEntryResponse entry = pwjEntryService.getById(pwjEntryId);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("docNumber", entry.getDocNumber());
+        out.put("vendor", entry.getVendor());
+        out.put("poValue", BigDecimal.ZERO);
+        out.put("alreadySent", BigDecimal.ZERO);
+        out.put("available", BigDecimal.ZERO);
+        out.put("resolved", false);
+
+        boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
+                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
+        if (!issued
+                || entry.getDocNumber() == null || entry.getDocNumber().isBlank()
+                || entry.getProjectName() == null || entry.getProjectName().isBlank()) {
+            return out;
+        }
+
+        Long accountProjectId = projectRepo.findByNameIgnoreCase(entry.getProjectName().trim())
+                .map(com.pwj.tracker.model.Project::getId)
+                .orElse(null);
+        Map<String, Object> summary = pwjEntryService.getDocSummaries().stream()
+                .filter(d -> entry.getDocNumber().equals(d.get("docNumber")))
+                .findFirst()
+                .orElse(null);
+        if (summary != null) {
+            out.put("poValue", toBigDecimal(summary.get("totalPayable")));
+        }
+        if (accountProjectId == null || summary == null) {
+            return out;
+        }
+
+        BigDecimal poValue = toBigDecimal(summary.get("totalPayable"));
+        BigDecimal alreadySent = repo.sumSentForPo(accountProjectId, entry.getDocNumber());
+        BigDecimal available = poValue.subtract(alreadySent).max(BigDecimal.ZERO);
+        out.put("poValue", poValue);
+        out.put("alreadySent", alreadySent);
+        out.put("available", available);
+        out.put("resolved", true);
+        return out;
+    }
+
+    private BigDecimal toBigDecimal(Object v) {
+        if (v == null) return BigDecimal.ZERO;
+        return new BigDecimal(String.valueOf(v));
+    }
+
     /** Cross-project tracker: every entry that has been sent for payment (part or full), newest first. */
     public List<ExpenseItemDto> getSentForPayment() {
         Map<Long, String> names = new HashMap<>();
         projectRepo.findAll().forEach(p -> names.put(p.getId(), p.getName()));
+        Map<String, Vendor> vendorsByName = new HashMap<>();
+        vendorRepo.findAll().forEach(v -> {
+            if (v.getName() != null) vendorsByName.putIfAbsent(v.getName().trim().toLowerCase(), v);
+        });
         Map<String, BigDecimal[]> poCache = new HashMap<>();
         return repo.findSentForPayment().stream().map(e -> {
             ExpenseItemDto d = toDto(e, poCache);
             d.setProjectName(names.getOrDefault(e.getProjectId(), "Unknown"));
+            enrichBeneficiary(d, e.getPartyName() == null ? null
+                    : vendorsByName.get(e.getPartyName().trim().toLowerCase()));
             return d;
         }).toList();
     }
 
-    // ── OH → VP approval on the sent amount — independent of Send for Payment itself ──
+    /** Fill the beneficiary bank fields on the DTO from the matched Vendor (name-based), for the bank export. */
+    private void enrichBeneficiary(ExpenseItemDto d, Vendor v) {
+        if (v == null) return;
+        String acc  = trimToNull(v.getAccountNumber());
+        String ifsc = trimToNull(v.getIfscCode());
+        String bank = trimToNull(v.getBankName());
+        // Fall back to the free-text bankDetails blob ("Bank | A/C No: 123 | IFSC: ABC0001234")
+        if ((acc == null || ifsc == null || bank == null) && v.getBankDetails() != null) {
+            for (String seg : v.getBankDetails().split("\\|")) {
+                String s = seg.trim();
+                if (s.isEmpty()) continue;
+                var accM  = java.util.regex.Pattern.compile("A/C\\s*No[.:]?\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(s);
+                var ifscM = java.util.regex.Pattern.compile("IFSC[.:]?\\s*([A-Za-z0-9]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(s);
+                if (accM.find())        { if (acc == null)  acc = accM.group(1).trim(); }
+                else if (ifscM.find())  { if (ifsc == null) ifsc = ifscM.group(1).trim(); }
+                else if (bank == null)  { bank = s; }
+            }
+        }
+        d.setBenAccountNumber(acc);
+        d.setBenIfscCode(ifsc);
+        d.setBenBankName(bank);
+        d.setBenEmail(trimToNull(v.getEmail()));
+        String digits = v.getPhoneNumber() == null ? "" : v.getPhoneNumber().replaceAll("\\D", "");
+        d.setBenMobile(digits.length() >= 10 && digits.length() <= 15 ? digits : null);
+    }
 
-    /** OH reviews a sent entry: may revise sentAmount, then Approve or Reject. */
+    private String trimToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    // ── OH → Admin → VP approval on the sent amount — independent of Send for Payment itself ──
+
+    /** OH reviews a sent entry: may revise sentAmount, then Approve or Reject. Resets Admin + VP. */
     public ExpenseItemDto setOhApproval(Long id, String status, BigDecimal revisedAmount) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
@@ -221,25 +399,82 @@ public class ExpenseItemService {
                 throw new IllegalArgumentException("Revised amount cannot be negative");
             }
             e.setSentAmount(revisedAmount);
+            recomputeDeductions(e);
         }
         e.setOhApprovalStatus(status);
-        // A fresh OH decision supersedes any prior VP decision on the old amount
+        // A fresh OH decision supersedes any later decision on the old amount
+        e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
         return toDto(repo.save(e));
     }
 
-    /** VP reviews an OH-approved entry: Approve or Reject (no amount revision). */
-    public ExpenseItemDto setVpApproval(Long id, String status) {
+    /** Admin reviews an OH-approved entry: Approve or Reject (no amount revision). Resets VP. */
+    public ExpenseItemDto setAdminApproval(Long id, String status) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
             throw new IllegalArgumentException("status must be APPROVED or REJECTED");
         }
         if (!"APPROVED".equals(normalizeApproval(e.getOhApprovalStatus()))) {
-            throw new IllegalArgumentException("Entry #" + id + " must be OH-approved before VP approval");
+            throw new IllegalArgumentException("Entry #" + id + " must be OH-approved before Admin approval");
+        }
+        e.setAdminApprovalStatus(status);
+        e.setVpApprovalStatus("PENDING");
+        return toDto(repo.save(e));
+    }
+
+    /** VP reviews an Admin-approved entry: Approve or Reject (no amount revision). */
+    public ExpenseItemDto setVpApproval(Long id, String status) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
+            throw new IllegalArgumentException("status must be APPROVED or REJECTED");
+        }
+        if (!"APPROVED".equals(normalizeApproval(e.getAdminApprovalStatus()))) {
+            throw new IllegalArgumentException("Entry #" + id + " must be Admin-approved before VP approval");
         }
         e.setVpApprovalStatus(status);
         return toDto(repo.save(e));
+    }
+
+    /**
+     * Set the deductions on a sent entry (TDS % + GST yes/no) and recompute the derived
+     * amounts. Changing the numbers resets Admin + VP approval to PENDING.
+     */
+    public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, Boolean gstDeducted) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        if (tdsPercent != null && tdsPercent.signum() < 0) {
+            throw new IllegalArgumentException("TDS % cannot be negative");
+        }
+        e.setTdsPercent(tdsPercent != null && tdsPercent.signum() == 0 ? null : tdsPercent);
+        e.setGstDeducted(Boolean.TRUE.equals(gstDeducted));
+        recomputeDeductions(e);
+        e.setAdminApprovalStatus("PENDING");
+        e.setVpApprovalStatus("PENDING");
+        return toDto(repo.save(e));
+    }
+
+    /**
+     * Both deductions are computed off the Amount Sent:
+     *   TDS Amt = sentAmount * tds% / 100
+     *   GST Amt = sentAmount * gst% / 100   (when GST = yes; gst% falls back to 18 if the item has none)
+     *   Approved Value = sentAmount - TDS Amt - GST Amt
+     */
+    private void recomputeDeductions(ExpenseItem e) {
+        BigDecimal base = safe(e.getSentAmount());
+        BigDecimal tdsAmt = e.getTdsPercent() == null ? BigDecimal.ZERO
+                : base.multiply(e.getTdsPercent())
+                      .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal gstAmt = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(e.getGstDeducted())) {
+            BigDecimal gstPct = safe(e.getGstPercent());
+            if (gstPct.signum() == 0) gstPct = BigDecimal.valueOf(18);
+            gstAmt = base.multiply(gstPct).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        }
+        e.setTdsAmount(tdsAmt);
+        e.setGstDeductionAmount(gstAmt);
+        e.setApprovedValue(base.subtract(tdsAmt).subtract(gstAmt));
     }
 
     private String normalizeApproval(String status) {
@@ -303,7 +538,13 @@ public class ExpenseItemService {
         d.setSentAmount(safe(e.getSentAmount()));
         d.setSentAt(e.getSentAt());
         d.setOhApprovalStatus(normalizeApproval(e.getOhApprovalStatus()));
+        d.setAdminApprovalStatus(normalizeApproval(e.getAdminApprovalStatus()));
         d.setVpApprovalStatus(normalizeApproval(e.getVpApprovalStatus()));
+        d.setTdsPercent(e.getTdsPercent());
+        d.setTdsAmount(e.getTdsAmount());
+        d.setGstDeducted(Boolean.TRUE.equals(e.getGstDeducted()));
+        d.setGstDeductionAmount(e.getGstDeductionAmount());
+        d.setApprovedValue(e.getApprovedValue());
         if (e.getRefNo() != null && !e.getRefNo().isBlank()) {
             String key = e.getProjectId() + "|" + e.getRefNo();
             BigDecimal[] poTotals = poCache.computeIfAbsent(key, k -> new BigDecimal[]{

@@ -65,6 +65,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok("Designation updated", userService.updateDesignation(id, body.get("designation"))));
     }
 
+    /** PATCH /api/v1/users/{id}/employee-number — Admin: set employee number */
+    @PatchMapping("/{id}/employee-number")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> updateEmployeeNumber(
+            @PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Employee number updated", userService.updateEmployeeNumber(id, body.get("employeeNumber"))));
+    }
+
     /** PATCH /api/v1/users/{id}/password — Admin: change user password */
     @PatchMapping("/{id}/password")
     public ResponseEntity<ApiResponse<UserDto.UserResponse>> changePassword(
@@ -77,5 +84,28 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable Long id) {
         userService.deactivateUser(id);
         return ResponseEntity.ok(ApiResponse.ok("User deactivated", null));
+    }
+
+    /** GET /api/v1/users/exited — Admin / VP: employees marked exited, with exit details */
+    @GetMapping("/exited")
+    public ResponseEntity<ApiResponse<List<UserDto.UserResponse>>> getExitedUsers() {
+        return ResponseEntity.ok(ApiResponse.ok("Exited employees fetched", userService.getExitedUsers()));
+    }
+
+    /**
+     * POST /api/v1/users/{id}/exit — Admin / VP: mark an employee exited from Happizo.
+     * Blocks their login and ends any live session; all records they created stay in the system.
+     * Body: { exitDate, exitType, exitReason, markedBy }
+     */
+    @PostMapping("/{id}/exit")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> markExit(
+            @PathVariable Long id, @Valid @RequestBody UserDto.MarkExitRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Employee marked exited", userService.markExit(id, req)));
+    }
+
+    /** POST /api/v1/users/{id}/reinstate — Admin / VP: undo an exit and restore login */
+    @PostMapping("/{id}/reinstate")
+    public ResponseEntity<ApiResponse<UserDto.UserResponse>> reinstate(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Employee reinstated", userService.reinstate(id)));
     }
 }

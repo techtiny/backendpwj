@@ -111,6 +111,30 @@ public class ExpenseItemController {
     }
 
     /**
+     * POST /api/expenses/send-pwj-for-payment
+     * Body: { "pwjEntryId": 123, "amount": 50000 }
+     * Procurement: send a payment request straight from an issued PWJ entry — vendor,
+     * doc number and project are auto-derived from the entry.
+     */
+    @PostMapping("/send-pwj-for-payment")
+    public ResponseEntity<ExpenseItemDto> sendPwjEntryForPayment(@RequestBody Map<String, Object> body) {
+        Long pwjEntryId = Long.valueOf(String.valueOf(body.get("pwjEntryId")));
+        BigDecimal amount = new BigDecimal(String.valueOf(body.get("amount")));
+        String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
+        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks));
+    }
+
+    /**
+     * GET /api/expenses/pwj-entry/{id}/payment-availability
+     * Procurement: how much of this issued PWJ doc's value is still available to send for
+     * payment — { docNumber, vendor, poValue, alreadySent, available, resolved }.
+     */
+    @GetMapping("/pwj-entry/{id}/payment-availability")
+    public ResponseEntity<Map<String, Object>> getPwjEntryPaymentAvailability(@PathVariable Long id) {
+        return ResponseEntity.ok(service.getPwjEntryPaymentAvailability(id));
+    }
+
+    /**
      * PATCH /api/expenses/{id}/oh-approval
      * Body: { "status": "APPROVED"|"REJECTED", "revisedAmount": 12345.00 }
      * OH may revise the sent amount before approving/rejecting.
@@ -124,11 +148,32 @@ public class ExpenseItemController {
         return ResponseEntity.ok(service.setOhApproval(id, status, revisedAmount));
     }
 
-    /** PATCH /api/expenses/{id}/vp-approval — Body: { "status": "APPROVED"|"REJECTED" } */
+    /** PATCH /api/expenses/{id}/admin-approval — Body: { "status": "APPROVED"|"REJECTED" }. Requires OH approved. */
+    @PatchMapping("/{id}/admin-approval")
+    public ResponseEntity<ExpenseItemDto> setAdminApproval(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(service.setAdminApproval(id, body.get("status")));
+    }
+
+    /** PATCH /api/expenses/{id}/vp-approval — Body: { "status": "APPROVED"|"REJECTED" }. Requires Admin approved. */
     @PatchMapping("/{id}/vp-approval")
     public ResponseEntity<ExpenseItemDto> setVpApproval(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(service.setVpApproval(id, body.get("status")));
+    }
+
+    /**
+     * PATCH /api/expenses/{id}/deductions
+     * Body: { "tdsPercent": 1|2|10|null, "gstDeducted": true|false }
+     * Sets the Send-for-Payment deductions; TDS Amt / GST Amt / Approved Value are recomputed.
+     */
+    @PatchMapping("/{id}/deductions")
+    public ResponseEntity<ExpenseItemDto> setDeductions(
+            @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        BigDecimal tdsPercent = body.get("tdsPercent") != null && !String.valueOf(body.get("tdsPercent")).isBlank()
+                ? new BigDecimal(String.valueOf(body.get("tdsPercent"))) : null;
+        Boolean gstDeducted = body.get("gstDeducted") != null && Boolean.parseBoolean(String.valueOf(body.get("gstDeducted")));
+        return ResponseEntity.ok(service.setDeductions(id, tdsPercent, gstDeducted));
     }
 
     @PostMapping("/repair-categories")

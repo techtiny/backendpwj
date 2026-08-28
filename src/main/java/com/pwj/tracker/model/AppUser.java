@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -39,12 +40,37 @@ public class AppUser {
     @Column(name = "designation", length = 150)
     private String designation;
 
+    @Column(name = "employee_number", length = 20)
+    private String employeeNumber;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 30)
     private Role role;
 
     @Column(name = "active", nullable = false)
     private Boolean active = true;
+
+    // ── Employee exit ("marked exited from Happizo") ──────────────────────
+    // The employee can no longer log in (active=false) but every record they
+    // created stays in the system. These fields capture the exit for HR.
+    @Column(name = "exited", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    @Builder.Default
+    private Boolean exited = false;
+
+    @Column(name = "exit_date")
+    private LocalDate exitDate;              // last working day
+
+    @Column(name = "exit_type", length = 30)
+    private String exitType;                 // RESIGNED | TERMINATED | ABSCONDED | RETIRED | OTHER
+
+    @Column(name = "exit_reason", columnDefinition = "TEXT")
+    private String exitReason;
+
+    @Column(name = "exit_marked_by", length = 150)
+    private String exitMarkedBy;             // username / full name of the Admin or VP who marked it
+
+    @Column(name = "exit_marked_at")
+    private LocalDateTime exitMarkedAt;
 
     @Builder.Default
     @Column(name = "is_test_account", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")

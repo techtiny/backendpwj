@@ -21,4 +21,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     boolean existsByUsername(String username);
 
     java.util.Optional<AppUser> findByFullNameAndActiveTrue(String fullName);
+
+    List<AppUser> findByExitedTrueOrderByExitDateDesc();
 }

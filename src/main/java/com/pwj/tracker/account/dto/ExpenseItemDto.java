@@ -33,10 +33,23 @@ public class ExpenseItemDto {
     private BigDecimal sentAmount;
     private java.time.LocalDateTime sentAt;
     private String ohApprovalStatus;
+    private String adminApprovalStatus;
     private String vpApprovalStatus;
+    private BigDecimal tdsPercent;
+    private BigDecimal tdsAmount;
+    private Boolean gstDeducted;
+    private BigDecimal gstDeductionAmount;
+    private BigDecimal approvedValue;
     private BigDecimal poValue;
     private BigDecimal poBalanceRemaining;
     private String projectName; // populated only by the cross-project "sent for payment" listing
+    // Beneficiary bank details — resolved from the Vendor record by name, populated only by the
+    // cross-project "sent for payment" listing (used to build the bank bulk-transfer export).
+    private String benAccountNumber;
+    private String benIfscCode;
+    private String benBankName;
+    private String benEmail;
+    private String benMobile;
 
     public ExpenseItemDto() {}
 
@@ -96,12 +109,34 @@ public class ExpenseItemDto {
     public void setSentAt(java.time.LocalDateTime sentAt) { this.sentAt = sentAt; }
     public String getOhApprovalStatus() { return ohApprovalStatus; }
     public void setOhApprovalStatus(String ohApprovalStatus) { this.ohApprovalStatus = ohApprovalStatus; }
+    public String getAdminApprovalStatus() { return adminApprovalStatus; }
+    public void setAdminApprovalStatus(String adminApprovalStatus) { this.adminApprovalStatus = adminApprovalStatus; }
     public String getVpApprovalStatus() { return vpApprovalStatus; }
     public void setVpApprovalStatus(String vpApprovalStatus) { this.vpApprovalStatus = vpApprovalStatus; }
+    public BigDecimal getTdsPercent() { return tdsPercent; }
+    public void setTdsPercent(BigDecimal tdsPercent) { this.tdsPercent = tdsPercent; }
+    public BigDecimal getTdsAmount() { return tdsAmount; }
+    public void setTdsAmount(BigDecimal tdsAmount) { this.tdsAmount = tdsAmount; }
+    public Boolean getGstDeducted() { return gstDeducted; }
+    public void setGstDeducted(Boolean gstDeducted) { this.gstDeducted = gstDeducted; }
+    public BigDecimal getGstDeductionAmount() { return gstDeductionAmount; }
+    public void setGstDeductionAmount(BigDecimal gstDeductionAmount) { this.gstDeductionAmount = gstDeductionAmount; }
+    public BigDecimal getApprovedValue() { return approvedValue; }
+    public void setApprovedValue(BigDecimal approvedValue) { this.approvedValue = approvedValue; }
     public BigDecimal getPoValue() { return poValue; }
     public void setPoValue(BigDecimal poValue) { this.poValue = poValue; }
     public BigDecimal getPoBalanceRemaining() { return poBalanceRemaining; }
     public void setPoBalanceRemaining(BigDecimal poBalanceRemaining) { this.poBalanceRemaining = poBalanceRemaining; }
     public String getProjectName() { return projectName; }
     public void setProjectName(String projectName) { this.projectName = projectName; }
+    public String getBenAccountNumber() { return benAccountNumber; }
+    public void setBenAccountNumber(String benAccountNumber) { this.benAccountNumber = benAccountNumber; }
+    public String getBenIfscCode() { return benIfscCode; }
+    public void setBenIfscCode(String benIfscCode) { this.benIfscCode = benIfscCode; }
+    public String getBenBankName() { return benBankName; }
+    public void setBenBankName(String benBankName) { this.benBankName = benBankName; }
+    public String getBenEmail() { return benEmail; }
+    public void setBenEmail(String benEmail) { this.benEmail = benEmail; }
+    public String getBenMobile() { return benMobile; }
+    public void setBenMobile(String benMobile) { this.benMobile = benMobile; }
 }

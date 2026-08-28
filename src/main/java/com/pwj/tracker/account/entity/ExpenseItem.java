@@ -73,13 +73,32 @@ public class ExpenseItem {
     // "Send for Payment" tracker's timeline filter, separate from paymentDate.
     private java.time.LocalDateTime sentAt;
 
-    // Two-stage approval on the sent amount, independent of the Send-for-Payment
-    // workflow itself — OH reviews first (and may revise sentAmount), then VP.
+    // Three-stage approval on the sent amount, independent of the Send-for-Payment
+    // workflow itself — OH reviews first (and may revise sentAmount), then Admin, then VP.
     @Column(nullable = false)
     private String ohApprovalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
 
     @Column(nullable = false)
+    private String adminApprovalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+
+    @Column(nullable = false)
     private String vpApprovalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+
+    // Deductions captured on the Send for Payment dashboard (during OH / Admin review).
+    @Column(precision = 5, scale = 2)
+    private BigDecimal tdsPercent;             // null / 1 / 2 / 10
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal tdsAmount;              // sentAmount * tdsPercent / 100
+
+    @Column(nullable = false)
+    private Boolean gstDeducted = false;       // GST yes/no
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal gstDeductionAmount;     // when gstDeducted: the PWJ doc GST amount
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal approvedValue;          // sentAmount - tdsAmount - gstDeductionAmount
 
     public ExpenseItem() {}
 
@@ -133,6 +152,18 @@ public class ExpenseItem {
     public void setSentAt(java.time.LocalDateTime sentAt) { this.sentAt = sentAt; }
     public String getOhApprovalStatus() { return ohApprovalStatus; }
     public void setOhApprovalStatus(String ohApprovalStatus) { this.ohApprovalStatus = ohApprovalStatus; }
+    public String getAdminApprovalStatus() { return adminApprovalStatus; }
+    public void setAdminApprovalStatus(String adminApprovalStatus) { this.adminApprovalStatus = adminApprovalStatus; }
     public String getVpApprovalStatus() { return vpApprovalStatus; }
     public void setVpApprovalStatus(String vpApprovalStatus) { this.vpApprovalStatus = vpApprovalStatus; }
+    public BigDecimal getTdsPercent() { return tdsPercent; }
+    public void setTdsPercent(BigDecimal tdsPercent) { this.tdsPercent = tdsPercent; }
+    public BigDecimal getTdsAmount() { return tdsAmount; }
+    public void setTdsAmount(BigDecimal tdsAmount) { this.tdsAmount = tdsAmount; }
+    public Boolean getGstDeducted() { return gstDeducted; }
+    public void setGstDeducted(Boolean gstDeducted) { this.gstDeducted = gstDeducted; }
+    public BigDecimal getGstDeductionAmount() { return gstDeductionAmount; }
+    public void setGstDeductionAmount(BigDecimal gstDeductionAmount) { this.gstDeductionAmount = gstDeductionAmount; }
+    public BigDecimal getApprovedValue() { return approvedValue; }
+    public void setApprovedValue(BigDecimal approvedValue) { this.approvedValue = approvedValue; }
 }

@@ -59,10 +59,12 @@ public class UserService {
                 .build();
     }
 
-    // ── Validate session token ──
+    // ── Validate session token ── (an exited / deactivated user's token is no longer valid)
     public boolean validateToken(String token) {
         if (token == null || token.isBlank()) return false;
-        return userRepository.findBySessionToken(token).isPresent();
+        return userRepository.findBySessionToken(token)
+                .filter(u -> Boolean.TRUE.equals(u.getActive()))
+                .isPresent();
     }
 
     // ── Logout — clear session token ──
@@ -87,9 +89,25 @@ public class UserService {
                 .fullName(req.getFullName())
                 .email(req.getEmail())
                 .phone(req.getPhone())
+                .employeeNumber(req.getEmployeeNumber() == null || req.getEmployeeNumber().isBlank()
+                        ? null : req.getEmployeeNumber().trim())
                 .role(req.getRole())
                 .active(true)
                 .build();
+        user = userRepository.save(user);
+        if (user.getEmployeeNumber() == null || user.getEmployeeNumber().isBlank()) {
+            user.setEmployeeNumber(String.format("EMP%04d", user.getId()));
+            user = userRepository.save(user);
+        }
+        return toResponse(user);
+    }
+
+    // ── Update employee number (Admin) ──
+    @Transactional
+    public UserDto.UserResponse updateEmployeeNumber(Long id, String employeeNumber) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setEmployeeNumber(employeeNumber == null || employeeNumber.isBlank() ? null : employeeNumber.trim());
         return toResponse(userRepository.save(user));
     }
 
@@ -162,6 +180,47 @@ public class UserService {
         userRepository.save(user);
     }
 
+    // ── Mark employee exited from Happizo (Admin / VP) ──
+    // Blocks login and ends any live session, but leaves every record they created intact.
+    @Transactional
+    public UserDto.UserResponse markExit(Long id, UserDto.MarkExitRequest req) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        String type = req.getExitType() == null || req.getExitType().isBlank()
+                ? "OTHER" : req.getExitType().trim().toUpperCase();
+        user.setExited(true);
+        user.setActive(false);                       // cannot log in
+        user.setSessionToken(null);                  // kick any live session immediately
+        user.setSessionCreatedAt(null);
+        user.setExitDate(req.getExitDate() != null ? req.getExitDate() : java.time.LocalDate.now());
+        user.setExitType(type);
+        user.setExitReason(req.getExitReason() == null || req.getExitReason().isBlank() ? null : req.getExitReason().trim());
+        user.setExitMarkedBy(req.getMarkedBy());
+        user.setExitMarkedAt(java.time.LocalDateTime.now());
+        return toResponse(userRepository.save(user));
+    }
+
+    // ── Reinstate a wrongly-exited employee (Admin / VP) ──
+    @Transactional
+    public UserDto.UserResponse reinstate(Long id) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setExited(false);
+        user.setActive(true);
+        user.setExitDate(null);
+        user.setExitType(null);
+        user.setExitReason(null);
+        user.setExitMarkedBy(null);
+        user.setExitMarkedAt(null);
+        return toResponse(userRepository.save(user));
+    }
+
+    // ── Exited employees (with exit details) ──
+    public List<UserDto.UserResponse> getExitedUsers() {
+        return userRepository.findByExitedTrueOrderByExitDateDesc()
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
     // ── Vendor methods — delegated to VendorService ──
     public List<Vendor> getVendors() {
         return vendorService.getVendors();
@@ -177,7 +236,13 @@ public class UserService {
                 .id(u.getId()).username(u.getUsername())
                 .fullName(u.getFullName()).email(u.getEmail())
                 .phone(u.getPhone()).designation(u.getDesignation())
+                .employeeNumber(u.getEmployeeNumber())
                 .role(u.getRole()).active(u.getActive())
-                .createdAt(u.getCreatedAt()).build();
+                .createdAt(u.getCreatedAt())
+                .exited(Boolean.TRUE.equals(u.getExited()))
+                .exitDate(u.getExitDate()).exitType(u.getExitType())
+                .exitReason(u.getExitReason()).exitMarkedBy(u.getExitMarkedBy())
+                .exitMarkedAt(u.getExitMarkedAt())
+                .build();
     }
 }

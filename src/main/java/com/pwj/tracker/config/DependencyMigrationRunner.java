@@ -76,6 +76,20 @@ public class DependencyMigrationRunner implements ApplicationRunner {
             log.info("eligible_for_accounts column created in project");
         } catch (Exception e) { /* already exists */ }
 
+        // Step 7: employee number on app_user — add column + backfill EMP0001-style codes
+        try {
+            jdbcTemplate.execute("ALTER TABLE app_user ADD COLUMN employee_number VARCHAR(20)");
+            log.info("employee_number column created in app_user");
+        } catch (Exception e) { /* already exists */ }
+        try {
+            int rows = jdbcTemplate.update(
+                "UPDATE app_user SET employee_number = CONCAT('EMP', LPAD(id, 4, '0')) " +
+                "WHERE employee_number IS NULL OR employee_number = ''");
+            if (rows > 0) log.info("Backfilled employee_number for {} users", rows);
+        } catch (Exception e) {
+            log.warn("Could not backfill employee_number: {}", e.getMessage());
+        }
+
         for (java.util.Map.Entry<String, String> e : designations.entrySet()) {
             try {
                 int rows = jdbcTemplate.update(

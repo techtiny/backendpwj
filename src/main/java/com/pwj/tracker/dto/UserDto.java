@@ -4,6 +4,7 @@ import com.pwj.tracker.model.AppUser;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class UserDto {
@@ -33,6 +34,7 @@ public class UserDto {
         @NotBlank public String fullName;
         public String email;
         public String phone;
+        public String employeeNumber;   // optional — auto-assigned (EMP0001…) when blank
         @NotNull  public AppUser.Role role;
     }
 
@@ -50,8 +52,24 @@ public class UserDto {
         public String email;
         public String phone;
         public String designation;
+        public String employeeNumber;
         public AppUser.Role role;
         public Boolean active;
         public LocalDateTime createdAt;
+        // Employee-exit details
+        public Boolean exited;
+        public LocalDate exitDate;
+        public String exitType;
+        public String exitReason;
+        public String exitMarkedBy;
+        public LocalDateTime exitMarkedAt;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class MarkExitRequest {
+        public LocalDate exitDate;   // last working day
+        public String exitType;      // RESIGNED | TERMINATED | ABSCONDED | RETIRED | OTHER
+        public String exitReason;
+        @NotBlank public String markedBy;
     }
 }
