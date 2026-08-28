@@ -192,6 +192,24 @@ public class PwjEntryController {
         return ResponseEntity.ok(ApiResponse.ok("Vendor email toggled", service.toggleVendorEmail(id)));
     }
 
+    /** PATCH /api/v1/pwj/entries/{id}/visibility — creator/Admin/Procurement: share a PR with other engineers, or make it private again */
+    @PatchMapping("/entries/{id}/visibility")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> updateVisibility(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        com.pwj.tracker.model.PwjEntry.Visibility visibility =
+                com.pwj.tracker.model.PwjEntry.Visibility.valueOf(body.get("visibility"));
+        return ResponseEntity.ok(ApiResponse.ok("Visibility updated", service.updateVisibility(id, visibility)));
+    }
+
+    /** PATCH /api/v1/pwj/entries/{id}/shared-engineers — creator/Admin/Procurement: share a PR with specific named engineers */
+    @PatchMapping("/entries/{id}/shared-engineers")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> updateSharedEngineers(
+            @PathVariable Long id, @RequestBody Map<String, List<String>> body) {
+        List<String> engineers = body.getOrDefault("engineers", List.of());
+        return ResponseEntity.ok(ApiResponse.ok("Shared engineers updated",
+                service.updateSharedEngineers(id, new java.util.HashSet<>(engineers))));
+    }
+
     /** POST /api/v1/pwj/entries/{id}/send-vendor-doc — Procurement: generate PDF from HTML and email to vendor */
     @PostMapping("/entries/{id}/send-vendor-doc")
     public ResponseEntity<ApiResponse<Void>> sendVendorDoc(

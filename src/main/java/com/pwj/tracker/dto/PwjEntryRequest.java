@@ -8,6 +8,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 // ============ Create / Update Request ============
 @Data
@@ -49,6 +50,8 @@ public class PwjEntryRequest {
     private PwjEntry.DocStatus docStatus;
     private String dependency;
     private Long projectId;
+    private PwjEntry.Visibility visibility;
+    private Set<String> sharedWithEngineers;
 }
 
 // ============ Approval Action Request ============

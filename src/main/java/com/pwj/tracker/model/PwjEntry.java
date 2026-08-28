@@ -9,6 +9,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "pwj_entry", indexes = {
@@ -150,6 +152,21 @@ public class PwjEntry {
     @Column(name = "is_test_data", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
     private Boolean isTestData = false;
 
+    // ── Visibility: lets the raising engineer share a PR with other
+    // engineers instead of keeping it visible only to themselves ──────────
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", length = 20, nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'PRIVATE'")
+    private Visibility visibility = Visibility.PRIVATE;
+
+    // ── Share this PR with specific named engineers (in addition to, or
+    // instead of, the blanket "visible to all engineers" flag above) ──────
+    @Builder.Default
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "pwj_entry_shared_engineers", joinColumns = @JoinColumn(name = "pwj_entry_id"))
+    @Column(name = "engineer_name", length = 100)
+    private Set<String> sharedWithEngineers = new HashSet<>();
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -170,5 +187,9 @@ public class PwjEntry {
 
     public enum DocStatus {
         DRAFT, PENDING_VP_APPROVAL, VP_APPROVED, VP_REJECTED, REVISION_REQUESTED, REVOKED
+    }
+
+    public enum Visibility {
+        PRIVATE, ENGINEERS
     }
 }

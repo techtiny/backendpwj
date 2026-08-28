@@ -110,11 +110,11 @@ public class PwjEntryService {
         LocalDateTime from = parseDate(dateFrom, false);
         LocalDateTime to   = parseDate(dateTo,   true);
         boolean isTestData = resolveIsTestAccount(raisedBy);
-        Page<PwjEntry> pageResult = repository.findFiltered(
+        Page<PwjEntry> pageResult = repository.findFilteredForEngineer(
                 (search == null || search.isBlank()) ? null : search,
                 statusEnum, approvalEnum,
                 (projectName == null || projectName.isBlank()) ? null : projectName,
-                raisedBy, dependencyFilter, from, to, isTestData, pageable);
+                raisedBy, PwjEntry.Visibility.ENGINEERS, dependencyFilter, from, to, isTestData, pageable);
         return buildPagedResponse(pageResult, page, size, raisedBy, isTestData);
     }
 
@@ -151,6 +151,8 @@ public class PwjEntryService {
                 .remarks(req.getRemarks())
                 .dependency("OH Approval")
                 .isTestData(resolveIsTestAccount(req.getRaisedBy()))
+                .visibility(req.getVisibility() != null ? req.getVisibility() : PwjEntry.Visibility.PRIVATE)
+                .sharedWithEngineers(req.getSharedWithEngineers() != null ? new java.util.HashSet<>(req.getSharedWithEngineers()) : new java.util.HashSet<>())
                 .build();
         PwjEntryResponse saved = saveAndBroadcast(entry);
         // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendNewEntryNotification(saved));
@@ -189,6 +191,32 @@ public class PwjEntryService {
         if (req.getDocNumber() != null && !req.getDocNumber().isBlank()) entry.setDocNumber(req.getDocNumber());
         if (req.getDocStatus() != null) entry.setDocStatus(req.getDocStatus());
         if (req.getDependency() != null && !req.getDependency().isBlank()) entry.setDependency(req.getDependency());
+        if (req.getVisibility() != null) entry.setVisibility(req.getVisibility());
+        if (req.getSharedWithEngineers() != null) {
+            entry.getSharedWithEngineers().clear();
+            entry.getSharedWithEngineers().addAll(req.getSharedWithEngineers());
+        }
+        return saveAndBroadcast(entry);
+    }
+
+    // ── Raising engineer / Admin / Procurement: share a PR with other
+    // engineers, or make it private again ─────────────────────────────────
+    @Transactional
+    public PwjEntryResponse updateVisibility(Long id, PwjEntry.Visibility visibility) {
+        PwjEntry entry = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        entry.setVisibility(visibility);
+        return saveAndBroadcast(entry);
+    }
+
+    // ── Raising engineer / Admin / Procurement: share a PR with specific
+    // named engineers (independent of the blanket visibility flag) ────────
+    @Transactional
+    public PwjEntryResponse updateSharedEngineers(Long id, java.util.Set<String> engineers) {
+        PwjEntry entry = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        entry.getSharedWithEngineers().clear();
+        if (engineers != null) entry.getSharedWithEngineers().addAll(engineers);
         return saveAndBroadcast(entry);
     }
 
@@ -854,6 +882,8 @@ public class PwjEntryService {
                 .docComments(e.getDocComments())
                 .siteRemarks(e.getSiteRemarks())
                 .isTestData(Boolean.TRUE.equals(e.getIsTestData()))
+                .visibility(e.getVisibility())
+                .sharedWithEngineers(new java.util.LinkedHashSet<>(e.getSharedWithEngineers()))
                 .docData(e.getDocData())
                 .dependency(e.getDependency())
                 .ack(Boolean.TRUE.equals(e.getAck()))

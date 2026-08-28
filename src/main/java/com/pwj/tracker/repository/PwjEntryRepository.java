@@ -47,6 +47,41 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
         Pageable pageable
     );
 
+    // ── Engineer view: their own entries, regardless of visibility, plus
+    // any entry another engineer has explicitly shared (visibility = ENGINEERS)
+    @Query("""
+        SELECT e FROM PwjEntry e
+        WHERE (:search IS NULL OR :search = '' OR
+               LOWER(e.materialRequired)  LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.projectName)       LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.raisedBy)          LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.vendor)            LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.boqNo)             LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(e.docNumber)         LIKE LOWER(CONCAT('%', :search, '%')) OR
+               CAST(e.id AS string)       LIKE CONCAT('%', :search, '%'))
+        AND (:status      IS NULL OR e.status         = :status)
+        AND (:approval    IS NULL OR e.approvalStatus = :approval)
+        AND (:projectName IS NULL OR :projectName = '' OR LOWER(e.projectName) = LOWER(:projectName))
+        AND (LOWER(e.raisedBy) = LOWER(:raisedBy) OR e.visibility = :sharedVisibility OR :raisedBy MEMBER OF e.sharedWithEngineers)
+        AND (:dependency  IS NULL OR :dependency  = '' OR e.dependency = :dependency)
+        AND (:dateFrom    IS NULL OR e.timestamp  >= :dateFrom)
+        AND (:dateTo      IS NULL OR e.timestamp  <= :dateTo)
+        AND e.isTestData = :isTestData
+    """)
+    Page<PwjEntry> findFilteredForEngineer(
+        @Param("search")           String search,
+        @Param("status")           PwjEntry.EntryStatus status,
+        @Param("approval")         PwjEntry.ApprovalStatus approval,
+        @Param("projectName")      String projectName,
+        @Param("raisedBy")         String raisedBy,
+        @Param("sharedVisibility") PwjEntry.Visibility sharedVisibility,
+        @Param("dependency")       String dependency,
+        @Param("dateFrom")        LocalDateTime dateFrom,
+        @Param("dateTo")          LocalDateTime dateTo,
+        @Param("isTestData")      Boolean isTestData,
+        Pageable pageable
+    );
+
     long countByStatusAndIsTestData(PwjEntry.EntryStatus status, Boolean isTestData);
     long countByApprovalStatusAndIsTestData(PwjEntry.ApprovalStatus approvalStatus, Boolean isTestData);
 

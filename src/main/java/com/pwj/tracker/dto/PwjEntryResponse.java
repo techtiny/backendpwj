@@ -8,6 +8,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 // ============ Response DTO ============
 @Data
@@ -50,6 +51,8 @@ public class PwjEntryResponse {
     private String docComments;
     private String siteRemarks;
     private Boolean isTestData;
+    private PwjEntry.Visibility visibility;
+    private Set<String> sharedWithEngineers;
     private String docData;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
