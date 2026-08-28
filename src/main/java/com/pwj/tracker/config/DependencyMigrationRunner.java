@@ -100,5 +100,35 @@ public class DependencyMigrationRunner implements ApplicationRunner {
                 log.warn("Could not set designation for '{}': {}", e.getKey(), ex.getMessage());
             }
         }
+
+        // Step 8: seed salary structures from the July 2026 salary sheet (Railway prod too).
+        // {username -> [monthlyGross, pfApplicable(1/0), ptApplicable(1/0)]}
+        java.util.Map<String, Object[]> salaries = new java.util.LinkedHashMap<>();
+        salaries.put("vidhya",    new Object[]{23000, 1, 1});
+        salaries.put("aakash",    new Object[]{34000, 1, 1});
+        salaries.put("sakthi",    new Object[]{37000, 1, 1});
+        salaries.put("jagan",     new Object[]{38200, 1, 1});
+        salaries.put("bhaskar",   new Object[]{47000, 1, 1});
+        salaries.put("jayakumar", new Object[]{62677, 1, 1});
+        salaries.put("balaji",    new Object[]{40200, 1, 1});
+        salaries.put("keerthi",   new Object[]{22000, 0, 0});
+        salaries.put("aravind",   new Object[]{35000, 0, 0});
+        salaries.put("sakthivel", new Object[]{20000, 0, 0});
+        salaries.put("sandy",     new Object[]{35000, 0, 0});
+        for (java.util.Map.Entry<String, Object[]> e : salaries.entrySet()) {
+            try {
+                int rows = jdbcTemplate.update(
+                    "INSERT INTO hr_employee_salary " +
+                    "(user_id, employee_number, monthly_gross, pf_applicable, pt_applicable, effective_from, note, created_by, created_at) " +
+                    "SELECT au.id, au.employee_number, ?, ?, ?, '2026-07-01', 'Seeded from July 2026 salary sheet', 'system', NOW() " +
+                    "FROM app_user au " +
+                    "WHERE LOWER(au.username) = ? " +
+                    "AND NOT EXISTS (SELECT 1 FROM hr_employee_salary s WHERE s.user_id = au.id)",
+                    e.getValue()[0], e.getValue()[1], e.getValue()[2], e.getKey().toLowerCase());
+                if (rows > 0) log.info("Seeded salary structure for user '{}'", e.getKey());
+            } catch (Exception ex) {
+                log.warn("Could not seed salary for '{}': {}", e.getKey(), ex.getMessage());
+            }
+        }
     }
 }
