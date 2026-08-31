@@ -217,11 +217,17 @@ public class ExpenseItemService {
 
     @Transactional
     public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks) {
-        return sendPwjEntryForPayment(pwjEntryId, amount, remarks, null);
+        return sendPwjEntryForPayment(pwjEntryId, amount, remarks, null, null);
     }
 
     @Transactional
     public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks, String paymentMadeAgainst) {
+        return sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, null);
+    }
+
+    @Transactional
+    public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks,
+                                                 String paymentMadeAgainst, String paymentStage) {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("Amount must be greater than zero");
         }
@@ -281,6 +287,7 @@ public class ExpenseItemService {
         e.setSentAt(java.time.LocalDateTime.now());
         if (remarks != null && !remarks.isBlank()) e.setRemarks(remarks.trim());
         if (paymentMadeAgainst != null && !paymentMadeAgainst.isBlank()) e.setPaymentMadeAgainst(paymentMadeAgainst.trim());
+        if (paymentStage != null && !paymentStage.isBlank()) e.setPaymentStage(paymentStage.trim());
 
         ExpenseItemDto dto = toDto(repo.save(e));
         dto.setProjectName(entry.getProjectName());
@@ -444,17 +451,21 @@ public class ExpenseItemService {
     }
 
     /**
-     * Set the deductions on a sent entry (TDS % + GST yes/no) and recompute the derived
-     * amounts. Changing the numbers resets Admin + VP approval to PENDING.
+     * Set the deductions on a sent entry — TDS % (auto TDS Amt) plus a manual Deduction
+     * amount entered by Admin / VP / OH — and recompute the Approved Value. Changing the
+     * numbers resets Admin + VP approval to PENDING.
      */
-    public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, Boolean gstDeducted) {
+    public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, BigDecimal deductionAmount) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (tdsPercent != null && tdsPercent.signum() < 0) {
             throw new IllegalArgumentException("TDS % cannot be negative");
         }
+        if (deductionAmount != null && deductionAmount.signum() < 0) {
+            throw new IllegalArgumentException("Deduction cannot be negative");
+        }
         e.setTdsPercent(tdsPercent != null && tdsPercent.signum() == 0 ? null : tdsPercent);
-        e.setGstDeducted(Boolean.TRUE.equals(gstDeducted));
+        e.setDeductionAmount(deductionAmount != null && deductionAmount.signum() == 0 ? null : deductionAmount);
         recomputeDeductions(e);
         e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
@@ -462,25 +473,18 @@ public class ExpenseItemService {
     }
 
     /**
-     * Both deductions are computed off the Amount Sent:
-     *   TDS Amt = sentAmount * tds% / 100
-     *   GST Amt = sentAmount * gst% / 100   (when GST = yes; gst% falls back to 18 if the item has none)
-     *   Approved Value = sentAmount - TDS Amt - GST Amt
+     *   TDS Amt        = sentAmount * tds% / 100
+     *   Deduction      = the manual amount entered by Admin / VP / OH
+     *   Approved Value = sentAmount - TDS Amt - Deduction
      */
     private void recomputeDeductions(ExpenseItem e) {
         BigDecimal base = safe(e.getSentAmount());
         BigDecimal tdsAmt = e.getTdsPercent() == null ? BigDecimal.ZERO
                 : base.multiply(e.getTdsPercent())
                       .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
-        BigDecimal gstAmt = BigDecimal.ZERO;
-        if (Boolean.TRUE.equals(e.getGstDeducted())) {
-            BigDecimal gstPct = safe(e.getGstPercent());
-            if (gstPct.signum() == 0) gstPct = BigDecimal.valueOf(18);
-            gstAmt = base.multiply(gstPct).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
-        }
+        BigDecimal deduction = safe(e.getDeductionAmount());
         e.setTdsAmount(tdsAmt);
-        e.setGstDeductionAmount(gstAmt);
-        e.setApprovedValue(base.subtract(tdsAmt).subtract(gstAmt));
+        e.setApprovedValue(base.subtract(tdsAmt).subtract(deduction));
     }
 
     private String normalizeApproval(String status) {
@@ -505,6 +509,7 @@ public class ExpenseItemService {
         e.setPaymentDate(dto.getPaymentDate());
         if (dto.getPaymentAgainst() != null)   e.setPaymentAgainst(dto.getPaymentAgainst());
         if (dto.getPaymentMadeAgainst() != null) e.setPaymentMadeAgainst(dto.getPaymentMadeAgainst());
+        if (dto.getPaymentStage() != null)     e.setPaymentStage(dto.getPaymentStage());
         if (dto.getPaidAmount() != null)       e.setPaidAmount(dto.getPaidAmount());
         if (dto.getPaidTo() != null)           e.setPaidTo(dto.getPaidTo());
         if (dto.getRemarks() != null)          e.setRemarks(dto.getRemarks());
@@ -534,6 +539,7 @@ public class ExpenseItemService {
         d.setPaymentDate(e.getPaymentDate());
         d.setPaymentAgainst(e.getPaymentAgainst());
         d.setPaymentMadeAgainst(e.getPaymentMadeAgainst());
+        d.setPaymentStage(e.getPaymentStage());
         d.setPaidAmount(safe(e.getPaidAmount()));
         d.setBalanceAsPerPwj(safe(e.getPwjTotalPayable()).subtract(safe(e.getPaidAmount())));
         d.setBalanceAsPerActual(safe(e.getVendorTotalPayable()).subtract(safe(e.getPaidAmount())));
@@ -550,8 +556,7 @@ public class ExpenseItemService {
         d.setVpApprovalStatus(normalizeApproval(e.getVpApprovalStatus()));
         d.setTdsPercent(e.getTdsPercent());
         d.setTdsAmount(e.getTdsAmount());
-        d.setGstDeducted(Boolean.TRUE.equals(e.getGstDeducted()));
-        d.setGstDeductionAmount(e.getGstDeductionAmount());
+        d.setDeductionAmount(e.getDeductionAmount());
         d.setApprovedValue(e.getApprovedValue());
         if (e.getRefNo() != null && !e.getRefNo().isBlank()) {
             String key = e.getProjectId() + "|" + e.getRefNo();

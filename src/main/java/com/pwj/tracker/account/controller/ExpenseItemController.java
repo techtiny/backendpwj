@@ -122,7 +122,8 @@ public class ExpenseItemController {
         BigDecimal amount = new BigDecimal(String.valueOf(body.get("amount")));
         String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
         String paymentMadeAgainst = body.get("paymentMadeAgainst") != null ? String.valueOf(body.get("paymentMadeAgainst")) : null;
-        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst));
+        String paymentStage = body.get("paymentStage") != null ? String.valueOf(body.get("paymentStage")) : null;
+        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage));
     }
 
     /**
@@ -165,16 +166,17 @@ public class ExpenseItemController {
 
     /**
      * PATCH /api/expenses/{id}/deductions
-     * Body: { "tdsPercent": 1|2|10|null, "gstDeducted": true|false }
-     * Sets the Send-for-Payment deductions; TDS Amt / GST Amt / Approved Value are recomputed.
+     * Body: { "tdsPercent": 1|2|10|null, "deductionAmount": 1234.00|null }
+     * Sets the Send-for-Payment deductions; TDS Amt / Approved Value are recomputed.
      */
     @PatchMapping("/{id}/deductions")
     public ResponseEntity<ExpenseItemDto> setDeductions(
             @PathVariable Long id, @RequestBody Map<String, Object> body) {
         BigDecimal tdsPercent = body.get("tdsPercent") != null && !String.valueOf(body.get("tdsPercent")).isBlank()
                 ? new BigDecimal(String.valueOf(body.get("tdsPercent"))) : null;
-        Boolean gstDeducted = body.get("gstDeducted") != null && Boolean.parseBoolean(String.valueOf(body.get("gstDeducted")));
-        return ResponseEntity.ok(service.setDeductions(id, tdsPercent, gstDeducted));
+        BigDecimal deductionAmount = body.get("deductionAmount") != null && !String.valueOf(body.get("deductionAmount")).isBlank()
+                ? new BigDecimal(String.valueOf(body.get("deductionAmount"))) : null;
+        return ResponseEntity.ok(service.setDeductions(id, tdsPercent, deductionAmount));
     }
 
     @PostMapping("/repair-categories")

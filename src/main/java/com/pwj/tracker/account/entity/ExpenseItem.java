@@ -89,7 +89,12 @@ public class ExpenseItem {
     @Column(nullable = false)
     private String vpApprovalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
 
-    // Deductions captured on the Send for Payment dashboard (during OH / Admin review).
+    // Which payment stage this is — chosen in the Send for Payment dialog.
+    // ADVANCE, STAGE_1, STAGE_2, STAGE_3, FINAL
+    @Column(name = "payment_stage", length = 20)
+    private String paymentStage;
+
+    // Deductions captured on the Send for Payment dashboard (during OH / Admin / VP review).
     @Column(precision = 5, scale = 2)
     private BigDecimal tdsPercent;             // null / 1 / 2 / 10
 
@@ -97,13 +102,17 @@ public class ExpenseItem {
     private BigDecimal tdsAmount;              // sentAmount * tdsPercent / 100
 
     @Column(nullable = false)
-    private Boolean gstDeducted = false;       // GST yes/no
+    private Boolean gstDeducted = false;       // legacy — no longer used
 
     @Column(precision = 15, scale = 2)
-    private BigDecimal gstDeductionAmount;     // when gstDeducted: the PWJ doc GST amount
+    private BigDecimal gstDeductionAmount;     // legacy — no longer used
+
+    // Manual deduction amount entered by Admin / VP / OH.
+    @Column(name = "deduction_amount", precision = 15, scale = 2)
+    private BigDecimal deductionAmount;
 
     @Column(precision = 15, scale = 2)
-    private BigDecimal approvedValue;          // sentAmount - tdsAmount - gstDeductionAmount
+    private BigDecimal approvedValue;          // sentAmount - tdsAmount - deductionAmount
 
     public ExpenseItem() {}
 
@@ -143,6 +152,10 @@ public class ExpenseItem {
     public void setPaymentAgainst(String paymentAgainst) { this.paymentAgainst = paymentAgainst; }
     public String getPaymentMadeAgainst() { return paymentMadeAgainst; }
     public void setPaymentMadeAgainst(String paymentMadeAgainst) { this.paymentMadeAgainst = paymentMadeAgainst; }
+    public String getPaymentStage() { return paymentStage; }
+    public void setPaymentStage(String paymentStage) { this.paymentStage = paymentStage; }
+    public BigDecimal getDeductionAmount() { return deductionAmount; }
+    public void setDeductionAmount(BigDecimal deductionAmount) { this.deductionAmount = deductionAmount; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
     public String getPaidTo() { return paidTo; }

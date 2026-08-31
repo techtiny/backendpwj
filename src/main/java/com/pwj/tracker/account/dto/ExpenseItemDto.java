@@ -23,6 +23,7 @@ public class ExpenseItemDto {
     private LocalDate paymentDate;
     private String paymentAgainst;
     private String paymentMadeAgainst;
+    private String paymentStage;
     private BigDecimal paidAmount;
     private BigDecimal balanceAsPerPwj;
     private BigDecimal balanceAsPerActual;
@@ -40,6 +41,7 @@ public class ExpenseItemDto {
     private BigDecimal tdsAmount;
     private Boolean gstDeducted;
     private BigDecimal gstDeductionAmount;
+    private BigDecimal deductionAmount;
     private BigDecimal approvedValue;
     private BigDecimal poValue;
     private BigDecimal poBalanceRemaining;
@@ -90,6 +92,10 @@ public class ExpenseItemDto {
     public void setPaymentAgainst(String paymentAgainst) { this.paymentAgainst = paymentAgainst; }
     public String getPaymentMadeAgainst() { return paymentMadeAgainst; }
     public void setPaymentMadeAgainst(String paymentMadeAgainst) { this.paymentMadeAgainst = paymentMadeAgainst; }
+    public String getPaymentStage() { return paymentStage; }
+    public void setPaymentStage(String paymentStage) { this.paymentStage = paymentStage; }
+    public BigDecimal getDeductionAmount() { return deductionAmount; }
+    public void setDeductionAmount(BigDecimal deductionAmount) { this.deductionAmount = deductionAmount; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
     public BigDecimal getBalanceAsPerPwj() { return balanceAsPerPwj; }
