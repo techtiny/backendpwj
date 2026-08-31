@@ -212,11 +212,16 @@ public class ExpenseItemService {
      */
     @Transactional
     public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount) {
-        return sendPwjEntryForPayment(pwjEntryId, amount, null);
+        return sendPwjEntryForPayment(pwjEntryId, amount, null, null);
     }
 
     @Transactional
     public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks) {
+        return sendPwjEntryForPayment(pwjEntryId, amount, remarks, null);
+    }
+
+    @Transactional
+    public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks, String paymentMadeAgainst) {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("Amount must be greater than zero");
         }
@@ -275,6 +280,7 @@ public class ExpenseItemService {
         e.setPaymentStatus(newTotalForPo.compareTo(poValue) >= 0 ? "FULL_PAYMENT_SENT" : "PART_PAYMENT_SENT");
         e.setSentAt(java.time.LocalDateTime.now());
         if (remarks != null && !remarks.isBlank()) e.setRemarks(remarks.trim());
+        if (paymentMadeAgainst != null && !paymentMadeAgainst.isBlank()) e.setPaymentMadeAgainst(paymentMadeAgainst.trim());
 
         ExpenseItemDto dto = toDto(repo.save(e));
         dto.setProjectName(entry.getProjectName());
@@ -498,6 +504,7 @@ public class ExpenseItemService {
         if (dto.getVendorTotalPayable() != null) e.setVendorTotalPayable(dto.getVendorTotalPayable());
         e.setPaymentDate(dto.getPaymentDate());
         if (dto.getPaymentAgainst() != null)   e.setPaymentAgainst(dto.getPaymentAgainst());
+        if (dto.getPaymentMadeAgainst() != null) e.setPaymentMadeAgainst(dto.getPaymentMadeAgainst());
         if (dto.getPaidAmount() != null)       e.setPaidAmount(dto.getPaidAmount());
         if (dto.getPaidTo() != null)           e.setPaidTo(dto.getPaidTo());
         if (dto.getRemarks() != null)          e.setRemarks(dto.getRemarks());
@@ -526,6 +533,7 @@ public class ExpenseItemService {
         d.setVendorTotalPayable(safe(e.getVendorTotalPayable()));
         d.setPaymentDate(e.getPaymentDate());
         d.setPaymentAgainst(e.getPaymentAgainst());
+        d.setPaymentMadeAgainst(e.getPaymentMadeAgainst());
         d.setPaidAmount(safe(e.getPaidAmount()));
         d.setBalanceAsPerPwj(safe(e.getPwjTotalPayable()).subtract(safe(e.getPaidAmount())));
         d.setBalanceAsPerActual(safe(e.getVendorTotalPayable()).subtract(safe(e.getPaidAmount())));

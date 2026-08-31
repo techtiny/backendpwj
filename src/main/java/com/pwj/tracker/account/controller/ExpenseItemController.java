@@ -121,7 +121,8 @@ public class ExpenseItemController {
         Long pwjEntryId = Long.valueOf(String.valueOf(body.get("pwjEntryId")));
         BigDecimal amount = new BigDecimal(String.valueOf(body.get("amount")));
         String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
-        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks));
+        String paymentMadeAgainst = body.get("paymentMadeAgainst") != null ? String.valueOf(body.get("paymentMadeAgainst")) : null;
+        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst));
     }
 
     /**

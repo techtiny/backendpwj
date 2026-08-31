@@ -22,6 +22,7 @@ public class ExpenseItemDto {
     private BigDecimal vendorTotalPayable;
     private LocalDate paymentDate;
     private String paymentAgainst;
+    private String paymentMadeAgainst;
     private BigDecimal paidAmount;
     private BigDecimal balanceAsPerPwj;
     private BigDecimal balanceAsPerActual;
@@ -87,6 +88,8 @@ public class ExpenseItemDto {
     public void setPaymentDate(LocalDate paymentDate) { this.paymentDate = paymentDate; }
     public String getPaymentAgainst() { return paymentAgainst; }
     public void setPaymentAgainst(String paymentAgainst) { this.paymentAgainst = paymentAgainst; }
+    public String getPaymentMadeAgainst() { return paymentMadeAgainst; }
+    public void setPaymentMadeAgainst(String paymentMadeAgainst) { this.paymentMadeAgainst = paymentMadeAgainst; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
     public BigDecimal getBalanceAsPerPwj() { return balanceAsPerPwj; }

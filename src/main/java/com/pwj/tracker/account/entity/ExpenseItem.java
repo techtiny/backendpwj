@@ -50,6 +50,11 @@ public class ExpenseItem {
     private LocalDate paymentDate;
     private String paymentAgainst;
 
+    // What this payment is booked against — chosen in the Send for Payment dialog.
+    // Comma-joined subset of: PO, WO, JO, VENDOR_INVOICE
+    @Column(name = "payment_made_against", length = 100)
+    private String paymentMadeAgainst;
+
     @Column(precision = 15, scale = 2)
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
@@ -136,6 +141,8 @@ public class ExpenseItem {
     public void setPaymentDate(LocalDate paymentDate) { this.paymentDate = paymentDate; }
     public String getPaymentAgainst() { return paymentAgainst; }
     public void setPaymentAgainst(String paymentAgainst) { this.paymentAgainst = paymentAgainst; }
+    public String getPaymentMadeAgainst() { return paymentMadeAgainst; }
+    public void setPaymentMadeAgainst(String paymentMadeAgainst) { this.paymentMadeAgainst = paymentMadeAgainst; }
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
     public String getPaidTo() { return paidTo; }
