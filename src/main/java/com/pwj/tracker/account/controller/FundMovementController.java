@@ -32,6 +32,27 @@ public class FundMovementController {
         return ResponseEntity.ok(service.balances());
     }
 
+    /**
+     * GET /api/fund-management/payment-funding — today's bank-transfer demand per project vs the
+     * available fund, the resulting shortfalls, and the surplus projects that can cover them.
+     */
+    @GetMapping("/payment-funding")
+    public ResponseEntity<Map<String, Object>> paymentFunding() {
+        return ResponseEntity.ok(service.paymentFunding());
+    }
+
+    /** POST /api/fund-management/transfer — { fromProjectId, toProjectId, amount, remarks } */
+    @PostMapping("/transfer")
+    public ResponseEntity<Void> transfer(@RequestBody Map<String, Object> body) {
+        Long from = body.get("fromProjectId") != null ? Long.valueOf(String.valueOf(body.get("fromProjectId"))) : null;
+        Long to = body.get("toProjectId") != null ? Long.valueOf(String.valueOf(body.get("toProjectId"))) : null;
+        java.math.BigDecimal amount = body.get("amount") != null
+                ? new java.math.BigDecimal(String.valueOf(body.get("amount"))) : null;
+        String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
+        service.transferFund(from, to, amount, remarks);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping
     public ResponseEntity<FundMovementDto> create(@RequestBody FundMovementDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
