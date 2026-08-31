@@ -8,9 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class FundMovementService {
@@ -72,6 +70,34 @@ public class FundMovementService {
     public void delete(Long id) {
         if (!repo.existsById(id)) throw new IllegalArgumentException("Fund movement not found: " + id);
         repo.deleteById(id);
+    }
+
+    /** Per-project fund balance: total inflow received for the project minus total outflow paid to it. */
+    public List<Map<String, Object>> balances() {
+        Map<Long, String> names = new HashMap<>();
+        projectRepo.findAll().forEach(p -> names.put(p.getId(), p.getName()));
+
+        Map<Long, BigDecimal[]> agg = new LinkedHashMap<>(); // projectId -> [inflow, outflow]
+        for (Object[] row : repo.sumGroupedByProjectAndDirection()) {
+            Long pid = ((Number) row[0]).longValue();
+            String dir = String.valueOf(row[1]);
+            BigDecimal sum = (BigDecimal) row[2];
+            BigDecimal[] a = agg.computeIfAbsent(pid, k -> new BigDecimal[]{ BigDecimal.ZERO, BigDecimal.ZERO });
+            if ("INFLOW".equals(dir)) a[0] = a[0].add(sum); else a[1] = a[1].add(sum);
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        agg.forEach((pid, a) -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("projectId", pid);
+            m.put("projectName", names.getOrDefault(pid, "Unknown"));
+            m.put("inflow", a[0]);
+            m.put("outflow", a[1]);
+            m.put("available", a[0].subtract(a[1]));
+            out.add(m);
+        });
+        out.sort((x, y) -> String.valueOf(x.get("projectName")).compareToIgnoreCase(String.valueOf(y.get("projectName"))));
+        return out;
     }
 
     private FundMovementDto toDto(FundMovement m, Map<Long, String> names) {

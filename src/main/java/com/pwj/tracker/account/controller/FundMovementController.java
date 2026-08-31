@@ -26,6 +26,12 @@ public class FundMovementController {
         return ResponseEntity.ok(service.list(direction));
     }
 
+    /** GET /api/fund-management/balances — per-project available fund (inflow − outflow). */
+    @GetMapping("/balances")
+    public ResponseEntity<List<Map<String, Object>>> balances() {
+        return ResponseEntity.ok(service.balances());
+    }
+
     @PostMapping
     public ResponseEntity<FundMovementDto> create(@RequestBody FundMovementDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
