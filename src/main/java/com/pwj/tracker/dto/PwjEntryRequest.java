@@ -19,6 +19,7 @@ public class PwjEntryRequest {
     private LocalDateTime timestamp;
 
     private String raisedBy;
+    private String raisedByProxy;
 
     @NotBlank(message = "Project name is required")
     private String projectName;

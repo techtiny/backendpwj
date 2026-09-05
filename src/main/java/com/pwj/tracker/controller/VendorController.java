@@ -39,14 +39,14 @@ public class VendorController {
         return ResponseEntity.ok(ApiResponse.ok("Pending vendors fetched", vendorService.getPendingVendors()));
     }
 
-    /** PUT /api/v1/vendors/{id}/approve — VP only */
+    /** PUT /api/v1/vendors/{id}/approve — Admin or VP */
     @PutMapping("/{id}/approve")
     public ResponseEntity<ApiResponse<Vendor>> approveVendor(@PathVariable Long id) {
         Vendor approved = vendorService.approveVendor(id);
         return ResponseEntity.ok(ApiResponse.ok("Vendor approved", approved));
     }
 
-    /** PUT /api/v1/vendors/{id}/reject — VP only */
+    /** PUT /api/v1/vendors/{id}/reject — Admin or VP */
     @PutMapping("/{id}/reject")
     public ResponseEntity<ApiResponse<Vendor>> rejectVendor(@PathVariable Long id) {
         Vendor rejected = vendorService.rejectVendor(id);
@@ -60,7 +60,7 @@ public class VendorController {
         return ResponseEntity.ok(ApiResponse.ok("Vendor sent for approval", resubmitted));
     }
 
-    /** POST /api/v1/vendors — Procurement / Admin: add new vendor */
+    /** POST /api/v1/vendors — Procurement / Admin / Procurement Engineer: add new vendor */
     @PostMapping
     public ResponseEntity<ApiResponse<Vendor>> createVendor(
             @Valid @RequestBody VendorRequest req) {

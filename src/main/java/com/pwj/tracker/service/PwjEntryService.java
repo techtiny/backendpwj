@@ -131,6 +131,7 @@ public class PwjEntryService {
         PwjEntry entry = PwjEntry.builder()
                 .timestamp(LocalDateTime.now())
                 .raisedBy(req.getRaisedBy())
+                .raisedByProxy(req.getRaisedByProxy())
                 .projectName(req.getProjectName())
                 .projectId(req.getProjectId())
                 .boqNo(req.getBoqNo())
@@ -863,7 +864,7 @@ public class PwjEntryService {
     private PwjEntryResponse toResponse(PwjEntry e) {
         return PwjEntryResponse.builder()
                 .id(e.getId()).timestamp(e.getTimestamp())
-                .raisedBy(e.getRaisedBy()).projectName(e.getProjectName()).projectId(e.getProjectId())
+                .raisedBy(e.getRaisedBy()).raisedByProxy(e.getRaisedByProxy()).projectName(e.getProjectName()).projectId(e.getProjectId())
                 .boqNo(e.getBoqNo()).materialRequired(e.getMaterialRequired())
                 .specification(e.getSpecification()).brand(e.getBrand())
                 .unit(e.getUnit()).quantity(e.getQuantity())

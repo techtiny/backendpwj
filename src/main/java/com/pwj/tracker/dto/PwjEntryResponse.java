@@ -19,6 +19,7 @@ public class PwjEntryResponse {
     private Long id;
     private LocalDateTime timestamp;
     private String raisedBy;
+    private String raisedByProxy;
     private String projectName;
     private String boqNo;
     private String materialRequired;

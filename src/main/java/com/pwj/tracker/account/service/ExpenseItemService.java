@@ -450,12 +450,26 @@ public class ExpenseItemService {
         return toDto(repo.save(e));
     }
 
+    /** VP sends an Admin-approved entry back to Admin for revision (e.g. to adjust TDS/Deduction). */
+    public ExpenseItemDto reviseAtVp(Long id) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        if (!"APPROVED".equals(normalizeApproval(e.getAdminApprovalStatus()))) {
+            throw new IllegalArgumentException("Entry #" + id + " must be Admin-approved before it can be sent back for revision");
+        }
+        e.setAdminApprovalStatus("PENDING");
+        e.setVpApprovalStatus("PENDING");
+        return toDto(repo.save(e));
+    }
+
     /**
-     * Set the deductions on a sent entry — TDS % (auto TDS Amt) plus a manual Deduction
-     * amount entered by Admin / VP / OH — and recompute the Approved Value. Changing the
-     * numbers resets Admin + VP approval to PENDING.
+     * Set the deductions on a sent entry — TDS % (auto TDS Amt), an optional manual
+     * Deduction amount, and whether GST (pulled from the originating PWJ doc's
+     * pwjGstAmount) is deducted — entered by Admin, on the dedicated TDS tab, only once
+     * OH has approved. Recomputes the Approved Value and resets Admin + VP approval to
+     * PENDING.
      */
-    public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, BigDecimal deductionAmount) {
+    public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, BigDecimal deductionAmount, Boolean gstDeducted) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (tdsPercent != null && tdsPercent.signum() < 0) {
@@ -466,25 +480,58 @@ public class ExpenseItemService {
         }
         e.setTdsPercent(tdsPercent != null && tdsPercent.signum() == 0 ? null : tdsPercent);
         e.setDeductionAmount(deductionAmount != null && deductionAmount.signum() == 0 ? null : deductionAmount);
+        if (gstDeducted != null) e.setGstDeducted(gstDeducted);
         recomputeDeductions(e);
         e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
         return toDto(repo.save(e));
     }
 
+    /** Records Invoice No. / TDS Paid Date / TDS Filed / Remarks on the TDS tab — a compliance record, independent of the approval chain. */
+    public ExpenseItemDto setTdsFiling(Long id, String invoiceNo, java.time.LocalDate tdsPaidDate, Boolean tdsFiled, String remarks) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        e.setInvoiceNo(invoiceNo);
+        e.setTdsPaidDate(tdsPaidDate);
+        if (tdsFiled != null) e.setTdsFiled(tdsFiled);
+        if (remarks != null) e.setRemarks(remarks);
+        return toDto(repo.save(e));
+    }
+
+    /**
+     * Records GST Invoice No. / GST Input Status / GST Input Date / GST Paid to Vendor Date /
+     * GST Paid Status / GST Remarks on the GST tab — independent of the TDS tab's own
+     * invoiceNo/remarks. GST % and GST Amt themselves (gstPercent, pwjGstAmount) are
+     * read-only here — fetched from the originating PO/WO/JO doc.
+     */
+    public ExpenseItemDto setGstFiling(Long id, String gstInvoiceNo, Boolean gstInputStatus, java.time.LocalDate gstInputDate,
+                                        java.time.LocalDate gstPaidToVendorDate, Boolean gstPaidStatus, String gstRemarks) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        e.setGstInvoiceNo(gstInvoiceNo);
+        if (gstInputStatus != null) e.setGstInputStatus(gstInputStatus);
+        e.setGstInputDate(gstInputDate);
+        e.setGstPaidToVendorDate(gstPaidToVendorDate);
+        if (gstPaidStatus != null) e.setGstPaidStatus(gstPaidStatus);
+        if (gstRemarks != null) e.setGstRemarks(gstRemarks);
+        return toDto(repo.save(e));
+    }
+
     /**
      *   TDS Amt        = sentAmount * tds% / 100
-     *   Deduction      = the manual amount entered by Admin / VP / OH
-     *   Approved Value = sentAmount - TDS Amt - Deduction
+     *   GST Amt        = gstDeducted ? pwjGstAmount : 0
+     *   Deduction      = the manual amount entered by Admin
+     *   Approved Value = sentAmount - TDS Amt - GST Amt - Deduction
      */
     private void recomputeDeductions(ExpenseItem e) {
         BigDecimal base = safe(e.getSentAmount());
         BigDecimal tdsAmt = e.getTdsPercent() == null ? BigDecimal.ZERO
                 : base.multiply(e.getTdsPercent())
                       .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal gstAmt = Boolean.TRUE.equals(e.getGstDeducted()) ? safe(e.getPwjGstAmount()) : BigDecimal.ZERO;
         BigDecimal deduction = safe(e.getDeductionAmount());
         e.setTdsAmount(tdsAmt);
-        e.setApprovedValue(base.subtract(tdsAmt).subtract(deduction));
+        e.setApprovedValue(base.subtract(tdsAmt).subtract(gstAmt).subtract(deduction));
     }
 
     private String normalizeApproval(String status) {
@@ -556,8 +603,18 @@ public class ExpenseItemService {
         d.setVpApprovalStatus(normalizeApproval(e.getVpApprovalStatus()));
         d.setTdsPercent(e.getTdsPercent());
         d.setTdsAmount(e.getTdsAmount());
+        d.setGstDeducted(Boolean.TRUE.equals(e.getGstDeducted()));
         d.setDeductionAmount(e.getDeductionAmount());
         d.setApprovedValue(e.getApprovedValue());
+        d.setInvoiceNo(e.getInvoiceNo());
+        d.setTdsPaidDate(e.getTdsPaidDate());
+        d.setTdsFiled(Boolean.TRUE.equals(e.getTdsFiled()));
+        d.setGstInputStatus(Boolean.TRUE.equals(e.getGstInputStatus()));
+        d.setGstInputDate(e.getGstInputDate());
+        d.setGstPaidToVendorDate(e.getGstPaidToVendorDate());
+        d.setGstPaidStatus(Boolean.TRUE.equals(e.getGstPaidStatus()));
+        d.setGstInvoiceNo(e.getGstInvoiceNo());
+        d.setGstRemarks(e.getGstRemarks());
         if (e.getRefNo() != null && !e.getRefNo().isBlank()) {
             String key = e.getProjectId() + "|" + e.getRefNo();
             BigDecimal[] poTotals = poCache.computeIfAbsent(key, k -> new BigDecimal[]{

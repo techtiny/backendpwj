@@ -13,6 +13,10 @@ public interface ExpenseItemRepository extends JpaRepository<ExpenseItem, Long> 
 
     List<ExpenseItem> findByProjectIdAndCategoryOrderById(Long projectId, String category);
 
+    // GSTR-2B import matching — candidates for a given Invoice No., excluding rows already
+    // confirmed (gstInputStatus = true) so a reimport never re-touches an already-marked row.
+    List<ExpenseItem> findByGstInvoiceNoIgnoreCaseAndGstInputStatus(String gstInvoiceNo, Boolean gstInputStatus);
+
     List<ExpenseItem> findByProjectIdOrderByCategoryAscIdAsc(Long projectId);
 
     @Query("SELECT e.refNo FROM ExpenseItem e WHERE e.projectId = :projectId AND e.refNo IS NOT NULL AND e.refNo != ''")

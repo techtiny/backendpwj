@@ -164,10 +164,16 @@ public class ExpenseItemController {
         return ResponseEntity.ok(service.setVpApproval(id, body.get("status")));
     }
 
+    /** PATCH /api/expenses/{id}/vp-revise — VP sends an Admin-approved entry back to Admin for revision. */
+    @PatchMapping("/{id}/vp-revise")
+    public ResponseEntity<ExpenseItemDto> reviseAtVp(@PathVariable Long id) {
+        return ResponseEntity.ok(service.reviseAtVp(id));
+    }
+
     /**
      * PATCH /api/expenses/{id}/deductions
-     * Body: { "tdsPercent": 1|2|10|null, "deductionAmount": 1234.00|null }
-     * Sets the Send-for-Payment deductions; TDS Amt / Approved Value are recomputed.
+     * Body: { "tdsPercent": 1|2|10|null, "deductionAmount": 1234.00|null, "gstDeducted": true|false|null }
+     * Sets the TDS-tab deductions; TDS Amt / Approved Value are recomputed.
      */
     @PatchMapping("/{id}/deductions")
     public ResponseEntity<ExpenseItemDto> setDeductions(
@@ -176,7 +182,46 @@ public class ExpenseItemController {
                 ? new BigDecimal(String.valueOf(body.get("tdsPercent"))) : null;
         BigDecimal deductionAmount = body.get("deductionAmount") != null && !String.valueOf(body.get("deductionAmount")).isBlank()
                 ? new BigDecimal(String.valueOf(body.get("deductionAmount"))) : null;
-        return ResponseEntity.ok(service.setDeductions(id, tdsPercent, deductionAmount));
+        Boolean gstDeducted = body.get("gstDeducted") != null
+                ? Boolean.valueOf(String.valueOf(body.get("gstDeducted"))) : null;
+        return ResponseEntity.ok(service.setDeductions(id, tdsPercent, deductionAmount, gstDeducted));
+    }
+
+    /**
+     * PATCH /api/expenses/{id}/tds-filing
+     * Body: { "invoiceNo": "INV-123"|null, "tdsPaidDate": "2026-09-05"|null, "tdsFiled": true|false|null, "remarks": "..."|null }
+     * Records TDS compliance/filing info on the TDS tab.
+     */
+    @PatchMapping("/{id}/tds-filing")
+    public ResponseEntity<ExpenseItemDto> setTdsFiling(
+            @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String invoiceNo = body.get("invoiceNo") != null ? String.valueOf(body.get("invoiceNo")) : null;
+        java.time.LocalDate tdsPaidDate = body.get("tdsPaidDate") != null && !String.valueOf(body.get("tdsPaidDate")).isBlank()
+                ? java.time.LocalDate.parse(String.valueOf(body.get("tdsPaidDate"))) : null;
+        Boolean tdsFiled = body.get("tdsFiled") != null ? Boolean.valueOf(String.valueOf(body.get("tdsFiled"))) : null;
+        String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
+        return ResponseEntity.ok(service.setTdsFiling(id, invoiceNo, tdsPaidDate, tdsFiled, remarks));
+    }
+
+    /**
+     * PATCH /api/expenses/{id}/gst-filing
+     * Body: { "gstInvoiceNo": "INV-123"|null, "gstInputStatus": true|false|null, "gstInputDate": "2026-09-05"|null,
+     *          "gstPaidToVendorDate": "2026-09-05"|null, "gstPaidStatus": true|false|null, "gstRemarks": "..."|null }
+     * Records GST compliance/filing info on the GST tab — independent of the TDS tab's own
+     * invoiceNo/remarks. GST % / GST Amt are read-only, fetched from the PWJ doc.
+     */
+    @PatchMapping("/{id}/gst-filing")
+    public ResponseEntity<ExpenseItemDto> setGstFiling(
+            @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String gstInvoiceNo = body.get("gstInvoiceNo") != null ? String.valueOf(body.get("gstInvoiceNo")) : null;
+        Boolean gstInputStatus = body.get("gstInputStatus") != null ? Boolean.valueOf(String.valueOf(body.get("gstInputStatus"))) : null;
+        java.time.LocalDate gstInputDate = body.get("gstInputDate") != null && !String.valueOf(body.get("gstInputDate")).isBlank()
+                ? java.time.LocalDate.parse(String.valueOf(body.get("gstInputDate"))) : null;
+        java.time.LocalDate gstPaidToVendorDate = body.get("gstPaidToVendorDate") != null && !String.valueOf(body.get("gstPaidToVendorDate")).isBlank()
+                ? java.time.LocalDate.parse(String.valueOf(body.get("gstPaidToVendorDate"))) : null;
+        Boolean gstPaidStatus = body.get("gstPaidStatus") != null ? Boolean.valueOf(String.valueOf(body.get("gstPaidStatus"))) : null;
+        String gstRemarks = body.get("gstRemarks") != null ? String.valueOf(body.get("gstRemarks")) : null;
+        return ResponseEntity.ok(service.setGstFiling(id, gstInvoiceNo, gstInputStatus, gstInputDate, gstPaidToVendorDate, gstPaidStatus, gstRemarks));
     }
 
     @PostMapping("/repair-categories")

@@ -101,8 +101,9 @@ public class ExpenseItem {
     @Column(precision = 15, scale = 2)
     private BigDecimal tdsAmount;              // sentAmount * tdsPercent / 100
 
+    // Whether GST (pwjGstAmount, from the originating PWJ doc) is subtracted in Approved Value — set on the TDS tab.
     @Column(nullable = false)
-    private Boolean gstDeducted = false;       // legacy — no longer used
+    private Boolean gstDeducted = false;
 
     @Column(precision = 15, scale = 2)
     private BigDecimal gstDeductionAmount;     // legacy — no longer used
@@ -113,6 +114,37 @@ public class ExpenseItem {
 
     @Column(precision = 15, scale = 2)
     private BigDecimal approvedValue;          // sentAmount - tdsAmount - deductionAmount
+
+    // TDS filing/compliance tracking — set on the TDS tab, independent of the approval chain.
+    @Column(name = "invoice_no", length = 100)
+    private String invoiceNo;
+
+    @Column(name = "tds_paid_date")
+    private LocalDate tdsPaidDate;
+
+    @Column(name = "tds_filed", nullable = false)
+    private Boolean tdsFiled = false;
+
+    // GST filing/compliance tracking — set on the GST tab. gstPercent / pwjGstAmount above
+    // are the actual rate/amount, fetched from the originating PO/WO/JO doc — read-only here.
+    @Column(name = "gst_input_status", nullable = false)
+    private Boolean gstInputStatus = false;
+
+    @Column(name = "gst_input_date")
+    private LocalDate gstInputDate;
+
+    @Column(name = "gst_paid_to_vendor_date")
+    private LocalDate gstPaidToVendorDate;
+
+    @Column(name = "gst_paid_status", nullable = false)
+    private Boolean gstPaidStatus = false;
+
+    // Independent of the TDS tab's invoiceNo/remarks — each tab tracks its own.
+    @Column(name = "gst_invoice_no", length = 100)
+    private String gstInvoiceNo;
+
+    @Column(name = "gst_remarks")
+    private String gstRemarks;
 
     public ExpenseItem() {}
 
@@ -186,4 +218,22 @@ public class ExpenseItem {
     public void setGstDeductionAmount(BigDecimal gstDeductionAmount) { this.gstDeductionAmount = gstDeductionAmount; }
     public BigDecimal getApprovedValue() { return approvedValue; }
     public void setApprovedValue(BigDecimal approvedValue) { this.approvedValue = approvedValue; }
+    public String getInvoiceNo() { return invoiceNo; }
+    public void setInvoiceNo(String invoiceNo) { this.invoiceNo = invoiceNo; }
+    public LocalDate getTdsPaidDate() { return tdsPaidDate; }
+    public void setTdsPaidDate(LocalDate tdsPaidDate) { this.tdsPaidDate = tdsPaidDate; }
+    public Boolean getTdsFiled() { return tdsFiled; }
+    public void setTdsFiled(Boolean tdsFiled) { this.tdsFiled = tdsFiled; }
+    public Boolean getGstInputStatus() { return gstInputStatus; }
+    public void setGstInputStatus(Boolean gstInputStatus) { this.gstInputStatus = gstInputStatus; }
+    public LocalDate getGstInputDate() { return gstInputDate; }
+    public void setGstInputDate(LocalDate gstInputDate) { this.gstInputDate = gstInputDate; }
+    public LocalDate getGstPaidToVendorDate() { return gstPaidToVendorDate; }
+    public void setGstPaidToVendorDate(LocalDate gstPaidToVendorDate) { this.gstPaidToVendorDate = gstPaidToVendorDate; }
+    public Boolean getGstPaidStatus() { return gstPaidStatus; }
+    public void setGstPaidStatus(Boolean gstPaidStatus) { this.gstPaidStatus = gstPaidStatus; }
+    public String getGstInvoiceNo() { return gstInvoiceNo; }
+    public void setGstInvoiceNo(String gstInvoiceNo) { this.gstInvoiceNo = gstInvoiceNo; }
+    public String getGstRemarks() { return gstRemarks; }
+    public void setGstRemarks(String gstRemarks) { this.gstRemarks = gstRemarks; }
 }

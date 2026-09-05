@@ -43,6 +43,15 @@ public class ExpenseItemDto {
     private BigDecimal gstDeductionAmount;
     private BigDecimal deductionAmount;
     private BigDecimal approvedValue;
+    private String invoiceNo;
+    private LocalDate tdsPaidDate;
+    private Boolean tdsFiled;
+    private Boolean gstInputStatus;
+    private LocalDate gstInputDate;
+    private LocalDate gstPaidToVendorDate;
+    private Boolean gstPaidStatus;
+    private String gstInvoiceNo;
+    private String gstRemarks;
     private BigDecimal poValue;
     private BigDecimal poBalanceRemaining;
     private String projectName; // populated only by the cross-project "sent for payment" listing
@@ -132,6 +141,24 @@ public class ExpenseItemDto {
     public void setGstDeductionAmount(BigDecimal gstDeductionAmount) { this.gstDeductionAmount = gstDeductionAmount; }
     public BigDecimal getApprovedValue() { return approvedValue; }
     public void setApprovedValue(BigDecimal approvedValue) { this.approvedValue = approvedValue; }
+    public String getInvoiceNo() { return invoiceNo; }
+    public void setInvoiceNo(String invoiceNo) { this.invoiceNo = invoiceNo; }
+    public LocalDate getTdsPaidDate() { return tdsPaidDate; }
+    public void setTdsPaidDate(LocalDate tdsPaidDate) { this.tdsPaidDate = tdsPaidDate; }
+    public Boolean getTdsFiled() { return tdsFiled; }
+    public void setTdsFiled(Boolean tdsFiled) { this.tdsFiled = tdsFiled; }
+    public Boolean getGstInputStatus() { return gstInputStatus; }
+    public void setGstInputStatus(Boolean gstInputStatus) { this.gstInputStatus = gstInputStatus; }
+    public LocalDate getGstInputDate() { return gstInputDate; }
+    public void setGstInputDate(LocalDate gstInputDate) { this.gstInputDate = gstInputDate; }
+    public LocalDate getGstPaidToVendorDate() { return gstPaidToVendorDate; }
+    public void setGstPaidToVendorDate(LocalDate gstPaidToVendorDate) { this.gstPaidToVendorDate = gstPaidToVendorDate; }
+    public Boolean getGstPaidStatus() { return gstPaidStatus; }
+    public void setGstPaidStatus(Boolean gstPaidStatus) { this.gstPaidStatus = gstPaidStatus; }
+    public String getGstInvoiceNo() { return gstInvoiceNo; }
+    public void setGstInvoiceNo(String gstInvoiceNo) { this.gstInvoiceNo = gstInvoiceNo; }
+    public String getGstRemarks() { return gstRemarks; }
+    public void setGstRemarks(String gstRemarks) { this.gstRemarks = gstRemarks; }
     public BigDecimal getPoValue() { return poValue; }
     public void setPoValue(BigDecimal poValue) { this.poValue = poValue; }
     public BigDecimal getPoBalanceRemaining() { return poBalanceRemaining; }

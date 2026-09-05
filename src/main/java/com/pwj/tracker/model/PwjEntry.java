@@ -35,6 +35,11 @@ public class PwjEntry {
     @Column(name = "raised_by", length = 100)
     private String raisedBy;
 
+    // Set only when an elevated role (Admin/VP/OH/Procurement) raises this entry on
+    // behalf of the engineer/PM named in raisedBy — holds the actual submitter's name.
+    @Column(name = "raised_by_proxy", length = 100)
+    private String raisedByProxy;
+
     @Column(name = "project_name", length = 200)
     private String projectName;
 
