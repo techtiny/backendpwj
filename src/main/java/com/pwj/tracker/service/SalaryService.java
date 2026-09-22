@@ -24,8 +24,9 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class SalaryService {
 
-    // Payroll runs on a fixed 30-day month; one casual leave a month is free.
-    private static final int DAYS_IN_MONTH = 30;
+    // Payroll cycle: 26th of the selected month through the 25th of the following month —
+    // not a calendar month. The day count varies by cycle (28-31 days depending on the
+    // months it spans) and is computed per-cycle in cycleBounds(). One casual leave is free.
     private static final int FREE_CL_PER_MONTH = 1;
     private static final BigDecimal PF_AMOUNT = new BigDecimal("1800");
     private static final BigDecimal PT_AMOUNT = new BigDecimal("208");
@@ -96,9 +97,16 @@ public class SalaryService {
 
     // ── Monthly salary sheet ─────────────────────────────────────────────
 
+    /** The payroll cycle for (year, month): the 26th of that month through the 25th of the next. */
+    private LocalDate[] cycleBounds(int year, int month) {
+        LocalDate start = LocalDate.of(year, month, 26);
+        LocalDate end = start.plusMonths(1).withDayOfMonth(25);
+        return new LocalDate[]{start, end};
+    }
+
     public List<SalaryDto.SheetRow> sheet(int year, int month) {
-        LocalDate monthStart = LocalDate.of(year, month, 1);
-        LocalDate monthEnd = monthStart.withDayOfMonth(monthStart.lengthOfMonth());
+        LocalDate[] bounds = cycleBounds(year, month);
+        LocalDate monthStart = bounds[0], monthEnd = bounds[1];
 
         Map<Long, SalaryMonthAdjustment> adj = adjustmentRepo.findByYearAndMonth(year, month).stream()
                 .collect(Collectors.toMap(SalaryMonthAdjustment::getUserId, a -> a));
@@ -129,8 +137,8 @@ public class SalaryService {
         a.setUpdatedBy(req.getActionBy());
         adjustmentRepo.save(a);
 
-        LocalDate monthStart = LocalDate.of(year, month, 1);
-        LocalDate monthEnd = monthStart.withDayOfMonth(monthStart.lengthOfMonth());
+        LocalDate[] bounds = cycleBounds(year, month);
+        LocalDate monthStart = bounds[0], monthEnd = bounds[1];
         EmployeeSalary s = salaryRepo
                 .findFirstByUserIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(userId, monthEnd)
                 .orElseThrow(() -> new RuntimeException("Define a salary structure for this employee first"));
@@ -141,6 +149,8 @@ public class SalaryService {
 
     private SalaryDto.SheetRow compute(AppUser u, EmployeeSalary s, int year, int month,
                                        LocalDate monthStart, LocalDate monthEnd, SalaryMonthAdjustment a) {
+        int daysInMonth = (int) (java.time.temporal.ChronoUnit.DAYS.between(monthStart, monthEnd) + 1);
+
         BigDecimal leaveDays = approvedLeaveDaysInMonth(u.getUsername(), monthStart, monthEnd);
         BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO);
 
@@ -151,11 +161,11 @@ public class SalaryService {
         if (a != null && a.getManualWorkingDays() != null) {
             workingDays = a.getManualWorkingDays();
         } else {
-            workingDays = BigDecimal.valueOf(DAYS_IN_MONTH).subtract(lop).add(extra);
+            workingDays = BigDecimal.valueOf(daysInMonth).subtract(lop).add(extra);
         }
-        workingDays = workingDays.max(BigDecimal.ZERO).min(BigDecimal.valueOf(DAYS_IN_MONTH));
+        workingDays = workingDays.max(BigDecimal.ZERO).min(BigDecimal.valueOf(daysInMonth));
 
-        BigDecimal factor = workingDays.divide(BigDecimal.valueOf(DAYS_IN_MONTH), 10, RoundingMode.HALF_UP);
+        BigDecimal factor = workingDays.divide(BigDecimal.valueOf(daysInMonth), 10, RoundingMode.HALF_UP);
 
         BigDecimal fGross = s.getMonthlyGross();
         boolean pf = Boolean.TRUE.equals(s.getPfApplicable());
@@ -177,7 +187,8 @@ public class SalaryService {
         return SalaryDto.SheetRow.builder()
                 .userId(u.getId()).employeeNumber(u.getEmployeeNumber()).name(u.getFullName())
                 .designation(u.getDesignation() != null ? u.getDesignation() : String.valueOf(u.getRole()))
-                .daysInMonth(DAYS_IN_MONTH).leaveDays(strip(leaveDays)).freeCasualLeave(FREE_CL_PER_MONTH)
+                .cycleStart(monthStart).cycleEnd(monthEnd)
+                .daysInMonth(daysInMonth).leaveDays(strip(leaveDays)).freeCasualLeave(FREE_CL_PER_MONTH)
                 .lopDays(strip(lop)).extraWorkingDays(strip(extra)).workingDays(strip(workingDays))
                 .fixedGross(money(fGross)).fixedBasic(pct(fGross, BASIC_PCT)).fixedHra(pct(fGross, HRA_PCT))
                 .fixedOther(pct(fGross, OTHER_PCT)).fixedTotalGross(money(fGross))
@@ -201,8 +212,13 @@ public class SalaryService {
             if ("COMP_OFF".equalsIgnoreCase(lr.getLeaveType())) continue; // earned by extra work — no LOP
             if ("PERMISSION".equalsIgnoreCase(lr.getLeaveType())) {
                 if (lr.getFromDate() == null || lr.getFromDate().isBefore(monthStart) || lr.getFromDate().isAfter(monthEnd)) continue;
-                int hrs = lr.getPermissionHours() != null ? lr.getPermissionHours() : 0;
-                total = total.add(BigDecimal.valueOf(hrs).divide(BigDecimal.valueOf(8), 2, RoundingMode.HALF_UP));
+                BigDecimal hrs = lr.getPermissionHours() != null ? lr.getPermissionHours() : BigDecimal.ZERO;
+                total = total.add(hrs.divide(BigDecimal.valueOf(8), 2, RoundingMode.HALF_UP));
+                continue;
+            }
+            if ("HALF_DAY".equalsIgnoreCase(lr.getLeaveType())) {
+                if (lr.getFromDate() == null || lr.getFromDate().isBefore(monthStart) || lr.getFromDate().isAfter(monthEnd)) continue;
+                total = total.add(new BigDecimal("0.5"));
                 continue;
             }
             LocalDate from = lr.getFromDate(), to = lr.getToDate() != null ? lr.getToDate() : lr.getFromDate();

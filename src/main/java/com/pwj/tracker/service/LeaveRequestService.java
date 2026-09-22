@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -24,7 +25,7 @@ public class LeaveRequestService {
     @Transactional
     public LeaveRequest apply(String username, String leaveType, LocalDate fromDate,
                               LocalDate toDate, String reason, String attachmentUrl,
-                              Integer permissionHours) {
+                              BigDecimal permissionHours, String fromTime, String toTime) {
         AppUser user = userRepository.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         if (user.getRole() == AppUser.Role.VP ||
@@ -33,14 +34,23 @@ public class LeaveRequestService {
             throw new RuntimeException("VP, CEO and OH roles are not permitted to apply for leave");
         }
 
-        int days;
+        BigDecimal days;
         if ("PERMISSION".equals(leaveType)) {
-            // Permission: single date, hours-based — fromDate and toDate are the same
+            // Permission: single date, time-range/hours-based — fromDate and toDate are the same
             toDate = fromDate;
-            days = 0;
+            days = BigDecimal.ZERO;
+            if (permissionHours == null || permissionHours.compareTo(BigDecimal.ZERO) <= 0
+                    || permissionHours.compareTo(BigDecimal.valueOf(2)) > 0) {
+                throw new RuntimeException("Permission must be 2 hours or less");
+            }
+        } else if ("HALF_DAY".equals(leaveType)) {
+            toDate = fromDate;
+            days = new BigDecimal("0.5");
+            fromTime = null; toTime = null; permissionHours = null;
         } else {
             if (fromDate.isAfter(toDate)) throw new RuntimeException("From date must be before to date");
-            days = (int) ChronoUnit.DAYS.between(fromDate, toDate) + 1;
+            days = BigDecimal.valueOf(ChronoUnit.DAYS.between(fromDate, toDate) + 1);
+            fromTime = null; toTime = null; permissionHours = null;
         }
 
         LeaveRequest req = LeaveRequest.builder()
@@ -53,6 +63,8 @@ public class LeaveRequestService {
                 .reason(reason)
                 .attachmentUrl(attachmentUrl)
                 .permissionHours(permissionHours)
+                .fromTime(fromTime)
+                .toTime(toTime)
                 .status("PENDING")
                 .build();
         return leaveRepository.save(req);

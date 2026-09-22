@@ -46,8 +46,10 @@ public class SalaryDto {
         public String name;
         public String designation;
 
-        public int daysInMonth;                 // fixed 30
-        public BigDecimal leaveDays;            // approved leave days in the month
+        public java.time.LocalDate cycleStart;  // 26th of the selected month
+        public java.time.LocalDate cycleEnd;    // 25th of the following month
+        public int daysInMonth;                 // actual day count of the cycle above (28-31)
+        public BigDecimal leaveDays;            // approved leave days in the cycle
         public int freeCasualLeave;             // 1
         public BigDecimal lopDays;              // loss-of-pay days actually applied
         public BigDecimal extraWorkingDays;

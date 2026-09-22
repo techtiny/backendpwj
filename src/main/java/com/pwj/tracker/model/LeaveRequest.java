@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -26,7 +27,7 @@ public class LeaveRequest {
     @Column(nullable = false)
     private String fullName;
 
-    // CASUAL, SICK, EARNED, COMP_OFF, PERMISSION, OTHER
+    // CASUAL, SICK, EARNED, COMP_OFF, PERMISSION, HALF_DAY, OTHER
     @Column(name = "leave_type", nullable = false, length = 20)
     private String leaveType;
 
@@ -36,12 +37,20 @@ public class LeaveRequest {
     @Column(name = "to_date", nullable = false)
     private LocalDate toDate;
 
-    @Column(name = "total_days")
-    private Integer totalDays;
+    // Whole days for normal leave, 0.5 for HALF_DAY, 0 for PERMISSION.
+    @Column(name = "total_days", precision = 5, scale = 2)
+    private BigDecimal totalDays;
 
-    /** Hours requested — only set when leaveType = PERMISSION */
-    @Column(name = "permission_hours")
-    private Integer permissionHours;
+    /** Hours requested (may be fractional, e.g. 1.5) — only set when leaveType = PERMISSION, always &lt;= 2. */
+    @Column(name = "permission_hours", precision = 4, scale = 2)
+    private BigDecimal permissionHours;
+
+    /** Clock time range the employee is away — only set when leaveType = PERMISSION. e.g. "14:00" / "15:30". */
+    @Column(name = "from_time", length = 5)
+    private String fromTime;
+
+    @Column(name = "to_time", length = 5)
+    private String toTime;
 
     @Column(length = 1000)
     private String reason;

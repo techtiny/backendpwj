@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -21,8 +22,8 @@ public class LeaveController {
     /** POST /api/v1/hr/leave */
     @PostMapping
     public ResponseEntity<ApiResponse<LeaveRequest>> apply(@RequestBody Map<String, String> body) {
-        Integer permissionHours = body.get("permissionHours") != null
-                ? Integer.parseInt(body.get("permissionHours")) : null;
+        BigDecimal permissionHours = body.get("permissionHours") != null && !body.get("permissionHours").isBlank()
+                ? new BigDecimal(body.get("permissionHours")) : null;
         return ResponseEntity.ok(ApiResponse.ok("Leave applied",
                 service.apply(
                         body.get("username"),
@@ -31,7 +32,9 @@ public class LeaveController {
                         body.get("toDate") != null ? LocalDate.parse(body.get("toDate")) : LocalDate.parse(body.get("fromDate")),
                         body.get("reason"),
                         body.get("attachmentUrl"),
-                        permissionHours
+                        permissionHours,
+                        body.get("fromTime"),
+                        body.get("toTime")
                 )));
     }
 
