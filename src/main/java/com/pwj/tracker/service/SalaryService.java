@@ -2,11 +2,13 @@ package com.pwj.tracker.service;
 
 import com.pwj.tracker.dto.SalaryDto;
 import com.pwj.tracker.model.AppUser;
+import com.pwj.tracker.model.Attendance;
 import com.pwj.tracker.model.EmployeeSalary;
 import com.pwj.tracker.model.Holiday;
 import com.pwj.tracker.model.LeaveRequest;
 import com.pwj.tracker.model.SalaryMonthAdjustment;
 import com.pwj.tracker.repository.AppUserRepository;
+import com.pwj.tracker.repository.AttendanceRepository;
 import com.pwj.tracker.repository.EmployeeSalaryRepository;
 import com.pwj.tracker.repository.LeaveRequestRepository;
 import com.pwj.tracker.repository.SalaryMonthAdjustmentRepository;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,6 +34,10 @@ public class SalaryService {
     // count varies by cycle (28-31 days depending on the months it spans) and is computed
     // per-cycle in cycleBounds(). One casual leave is free.
     private static final int FREE_CL_PER_MONTH = 1;
+    // Roles Team Attendance requires a daily check-in from — only these are subject to the
+    // no-check-in-counts-as-unauthorized-leave rule below.
+    private static final Set<AppUser.Role> CHECKIN_ROLES = EnumSet.of(
+            AppUser.Role.ENGINEER, AppUser.Role.PROJECT_MANAGER, AppUser.Role.ADMIN, AppUser.Role.PROCUREMENT);
     private static final BigDecimal PF_AMOUNT = new BigDecimal("1800");
     private static final BigDecimal PT_AMOUNT = new BigDecimal("208");
     private static final BigDecimal BASIC_PCT = new BigDecimal("0.50");
@@ -42,6 +49,7 @@ public class SalaryService {
     private final SalaryMonthAdjustmentRepository adjustmentRepo;
     private final LeaveRequestRepository leaveRepo;
     private final HolidayRepository holidayRepo;
+    private final AttendanceRepository attendanceRepo;
 
     // ── Salary structures ────────────────────────────────────────────────
 
@@ -158,7 +166,11 @@ public class SalaryService {
         Set<LocalDate> holidays = holidayRepo.findByDateBetweenOrderByDateAsc(monthStart, monthEnd)
                 .stream().map(Holiday::getDate).collect(Collectors.toSet());
         BigDecimal leaveDays = approvedLeaveDaysInMonth(u.getUsername(), monthStart, monthEnd, holidays);
-        BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO);
+        BigDecimal unauthorizedDays = unauthorizedAbsenceDays(u, monthStart, monthEnd, holidays);
+        // Unauthorized no-shows skip the free-CL grace entirely — it only applies to leave
+        // that was actually applied for.
+        BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO)
+                .add(unauthorizedDays);
 
         BigDecimal extra = a != null && a.getExtraWorkingDays() != null ? a.getExtraWorkingDays() : BigDecimal.ZERO;
         BigDecimal lop = a != null && a.getManualLopDays() != null ? a.getManualLopDays() : computedLop;
@@ -188,13 +200,14 @@ public class SalaryService {
         BigDecimal aEmployer = aPf;
 
         String remarks = a != null && a.getRemarks() != null && !a.getRemarks().isBlank()
-                ? a.getRemarks() : autoRemark(leaveDays, lop);
+                ? a.getRemarks() : autoRemark(leaveDays, lop, unauthorizedDays);
 
         return SalaryDto.SheetRow.builder()
                 .userId(u.getId()).employeeNumber(u.getEmployeeNumber()).name(u.getFullName())
                 .designation(u.getDesignation() != null ? u.getDesignation() : String.valueOf(u.getRole()))
                 .cycleStart(monthStart).cycleEnd(monthEnd)
                 .daysInMonth(daysInMonth).leaveDays(strip(leaveDays)).freeCasualLeave(FREE_CL_PER_MONTH)
+                .unauthorizedDays(strip(unauthorizedDays))
                 .lopDays(strip(lop)).extraWorkingDays(strip(extra)).workingDays(strip(workingDays))
                 .fixedGross(money(fGross)).fixedBasic(pct(fGross, BASIC_PCT)).fixedHra(pct(fGross, HRA_PCT))
                 .fixedOther(pct(fGross, OTHER_PCT)).fixedTotalGross(money(fGross))
@@ -237,11 +250,58 @@ public class SalaryService {
         return total;
     }
 
-    private String autoRemark(BigDecimal leaveDays, BigDecimal lop) {
-        if (leaveDays.signum() == 0) return "No leave";
+    /** Mon-Sat, no check-in, no approved leave, not a declared holiday, and only up to
+     *  yesterday (never today — it's still in progress). Team Attendance roles only. */
+    private BigDecimal unauthorizedAbsenceDays(AppUser u, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
+        if (!CHECKIN_ROLES.contains(u.getRole())) return BigDecimal.ZERO;
+
+        LocalDate cutoff = LocalDate.now().minusDays(1); // never judge today or the future
+        LocalDate effectiveEnd = monthEnd.isAfter(cutoff) ? cutoff : monthEnd;
+        if (effectiveEnd.isBefore(monthStart)) return BigDecimal.ZERO;
+
+        Set<LocalDate> leaveCovered = leaveCoveredDates(u.getUsername(), monthStart, effectiveEnd);
+        Set<LocalDate> checkedIn = attendanceRepo.findByUsernameAndWorkDateBetween(u.getUsername(), monthStart, effectiveEnd)
+                .stream().map(Attendance::getWorkDate).collect(Collectors.toSet());
+
+        int count = 0;
+        for (LocalDate d = monthStart; !d.isAfter(effectiveEnd); d = d.plusDays(1)) {
+            if (d.getDayOfWeek() == DayOfWeek.SUNDAY) continue;
+            if (holidays.contains(d)) continue;
+            if (leaveCovered.contains(d)) continue;
+            if (checkedIn.contains(d)) continue;
+            count++;
+        }
+        return BigDecimal.valueOf(count);
+    }
+
+    /** Every date covered by an approved leave request (any full/half-day type — PERMISSION
+     *  excluded, it's hours-based and doesn't explain a whole day with no check-in). */
+    private Set<LocalDate> leaveCoveredDates(String username, LocalDate monthStart, LocalDate monthEnd) {
+        Set<LocalDate> covered = new HashSet<>();
+        for (LeaveRequest lr : leaveRepo.findByUsernameOrderByCreatedAtDesc(username)) {
+            if (!"APPROVED".equalsIgnoreCase(lr.getStatus())) continue;
+            if ("PERMISSION".equalsIgnoreCase(lr.getLeaveType())) continue;
+            if ("HALF_DAY".equalsIgnoreCase(lr.getLeaveType())) {
+                if (lr.getFromDate() != null) covered.add(lr.getFromDate());
+                continue;
+            }
+            LocalDate from = lr.getFromDate(), to = lr.getToDate() != null ? lr.getToDate() : lr.getFromDate();
+            if (from == null) continue;
+            LocalDate s = from.isBefore(monthStart) ? monthStart : from;
+            LocalDate e = to.isAfter(monthEnd) ? monthEnd : to;
+            for (LocalDate d = s; !d.isAfter(e); d = d.plusDays(1)) covered.add(d);
+        }
+        return covered;
+    }
+
+    private String autoRemark(BigDecimal leaveDays, BigDecimal lop, BigDecimal unauthorizedDays) {
+        String suffix = unauthorizedDays.signum() > 0
+                ? " (incl. " + strip(unauthorizedDays).toPlainString() + " unauthorized absence, no free CL)" : "";
+        if (leaveDays.signum() == 0 && unauthorizedDays.signum() == 0) return "No leave";
+        if (leaveDays.signum() == 0) return strip(lop).toPlainString() + " LOP" + suffix;
         String ld = strip(leaveDays).toPlainString();
         if (lop.signum() == 0) return ld + " day leave — within 1 CL";
-        return ld + " day leave — 1 CL free, " + strip(lop).toPlainString() + " LOP";
+        return ld + " day leave — 1 CL free, " + strip(lop).toPlainString() + " LOP" + suffix;
     }
 
     private BigDecimal pct(BigDecimal base, BigDecimal p) { return money(base.multiply(p)); }

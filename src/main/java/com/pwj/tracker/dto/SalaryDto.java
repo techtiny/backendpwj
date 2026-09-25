@@ -51,6 +51,7 @@ public class SalaryDto {
         public int daysInMonth;                 // actual day count of the cycle above (28-31)
         public BigDecimal leaveDays;            // approved leave days in the cycle
         public int freeCasualLeave;             // 1
+        public BigDecimal unauthorizedDays;     // Mon-Sat, no check-in, no leave, not a holiday — straight to LOP, no free CL
         public BigDecimal lopDays;              // loss-of-pay days actually applied
         public BigDecimal extraWorkingDays;
         public BigDecimal workingDays;
