@@ -24,9 +24,10 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class SalaryService {
 
-    // Payroll cycle: 26th of the selected month through the 25th of the following month —
-    // not a calendar month. The day count varies by cycle (28-31 days depending on the
-    // months it spans) and is computed per-cycle in cycleBounds(). One casual leave is free.
+    // Payroll cycle: 26th of the previous month through the 25th of the selected month —
+    // not a calendar month (e.g. month=September means the Aug 26 – Sep 25 cycle). The day
+    // count varies by cycle (28-31 days depending on the months it spans) and is computed
+    // per-cycle in cycleBounds(). One casual leave is free.
     private static final int FREE_CL_PER_MONTH = 1;
     private static final BigDecimal PF_AMOUNT = new BigDecimal("1800");
     private static final BigDecimal PT_AMOUNT = new BigDecimal("208");
@@ -97,10 +98,10 @@ public class SalaryService {
 
     // ── Monthly salary sheet ─────────────────────────────────────────────
 
-    /** The payroll cycle for (year, month): the 26th of that month through the 25th of the next. */
+    /** The payroll cycle for (year, month): the 26th of the previous month through the 25th of this one. */
     private LocalDate[] cycleBounds(int year, int month) {
-        LocalDate start = LocalDate.of(year, month, 26);
-        LocalDate end = start.plusMonths(1).withDayOfMonth(25);
+        LocalDate end = LocalDate.of(year, month, 25);
+        LocalDate start = end.minusMonths(1).withDayOfMonth(26);
         return new LocalDate[]{start, end};
     }
 
