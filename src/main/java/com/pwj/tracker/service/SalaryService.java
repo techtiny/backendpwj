@@ -251,8 +251,10 @@ public class SalaryService {
         return total;
     }
 
-    /** Mon-Sat, no check-in, no approved leave, not a declared holiday, and only up to
-     *  yesterday (never today — it's still in progress). Team Attendance roles only. */
+    /** Mon-Sat, no *complete* attendance (missing check-in, or checked in but never checked
+     *  out — same "Missing Check-Out" days Attendance's Needs Review tab flags as ABSENT), no
+     *  approved leave, not a declared holiday, and only up to yesterday (never today — it's
+     *  still in progress). Team Attendance roles only. */
     private BigDecimal unauthorizedAbsenceDays(AppUser u, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
         if (!CHECKIN_ROLES.contains(u.getRole())) return BigDecimal.ZERO;
 
@@ -261,15 +263,16 @@ public class SalaryService {
         if (effectiveEnd.isBefore(monthStart)) return BigDecimal.ZERO;
 
         Set<LocalDate> leaveCovered = leaveCoveredDates(u.getUsername(), monthStart, effectiveEnd);
-        Set<LocalDate> checkedIn = attendanceRepo.findByUsernameAndWorkDateBetween(u.getUsername(), monthStart, effectiveEnd)
-                .stream().map(Attendance::getWorkDate).collect(Collectors.toSet());
+        Set<LocalDate> completeAttendance = attendanceRepo.findByUsernameAndWorkDateBetween(u.getUsername(), monthStart, effectiveEnd)
+                .stream().filter(att -> att.getCheckOutTime() != null)
+                .map(Attendance::getWorkDate).collect(Collectors.toSet());
 
         int count = 0;
         for (LocalDate d = monthStart; !d.isAfter(effectiveEnd); d = d.plusDays(1)) {
             if (d.getDayOfWeek() == DayOfWeek.SUNDAY) continue;
             if (holidays.contains(d)) continue;
             if (leaveCovered.contains(d)) continue;
-            if (checkedIn.contains(d)) continue;
+            if (completeAttendance.contains(d)) continue;
             count++;
         }
         return BigDecimal.valueOf(count);
