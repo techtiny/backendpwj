@@ -3,12 +3,14 @@ package com.pwj.tracker.service;
 import com.pwj.tracker.dto.SalaryDto;
 import com.pwj.tracker.model.AppUser;
 import com.pwj.tracker.model.EmployeeSalary;
+import com.pwj.tracker.model.Holiday;
 import com.pwj.tracker.model.LeaveRequest;
 import com.pwj.tracker.model.SalaryMonthAdjustment;
 import com.pwj.tracker.repository.AppUserRepository;
 import com.pwj.tracker.repository.EmployeeSalaryRepository;
 import com.pwj.tracker.repository.LeaveRequestRepository;
 import com.pwj.tracker.repository.SalaryMonthAdjustmentRepository;
+import com.pwj.tracker.repository.HolidayRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,7 @@ public class SalaryService {
     private final EmployeeSalaryRepository salaryRepo;
     private final SalaryMonthAdjustmentRepository adjustmentRepo;
     private final LeaveRequestRepository leaveRepo;
+    private final HolidayRepository holidayRepo;
 
     // ── Salary structures ────────────────────────────────────────────────
 
@@ -152,7 +155,9 @@ public class SalaryService {
                                        LocalDate monthStart, LocalDate monthEnd, SalaryMonthAdjustment a) {
         int daysInMonth = (int) (java.time.temporal.ChronoUnit.DAYS.between(monthStart, monthEnd) + 1);
 
-        BigDecimal leaveDays = approvedLeaveDaysInMonth(u.getUsername(), monthStart, monthEnd);
+        Set<LocalDate> holidays = holidayRepo.findByDateBetweenOrderByDateAsc(monthStart, monthEnd)
+                .stream().map(Holiday::getDate).collect(Collectors.toSet());
+        BigDecimal leaveDays = approvedLeaveDaysInMonth(u.getUsername(), monthStart, monthEnd, holidays);
         BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO);
 
         BigDecimal extra = a != null && a.getExtraWorkingDays() != null ? a.getExtraWorkingDays() : BigDecimal.ZERO;
@@ -205,8 +210,10 @@ public class SalaryService {
                 .build();
     }
 
-    /** Approved leave days that fall inside the month; PERMISSION is excluded from LOP entirely. */
-    private BigDecimal approvedLeaveDaysInMonth(String username, LocalDate monthStart, LocalDate monthEnd) {
+    /** Approved leave days that fall inside the month; PERMISSION is excluded from LOP entirely,
+     *  and any day that's a declared company holiday doesn't count either — the office was
+     *  already closed, so it shouldn't burn the employee's leave/CL or push them into LOP. */
+    private BigDecimal approvedLeaveDaysInMonth(String username, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
         BigDecimal total = BigDecimal.ZERO;
         for (LeaveRequest lr : leaveRepo.findByUsernameOrderByCreatedAtDesc(username)) {
             if (!"APPROVED".equalsIgnoreCase(lr.getStatus())) continue;
@@ -214,6 +221,7 @@ public class SalaryService {
             if ("PERMISSION".equalsIgnoreCase(lr.getLeaveType())) continue; // hours-based, doesn't count toward LOP
             if ("HALF_DAY".equalsIgnoreCase(lr.getLeaveType())) {
                 if (lr.getFromDate() == null || lr.getFromDate().isBefore(monthStart) || lr.getFromDate().isAfter(monthEnd)) continue;
+                if (holidays.contains(lr.getFromDate())) continue;
                 total = total.add(new BigDecimal("0.5"));
                 continue;
             }
@@ -223,7 +231,8 @@ public class SalaryService {
             LocalDate e = to.isAfter(monthEnd) ? monthEnd : to;
             if (e.isBefore(s)) continue;
             long days = java.time.temporal.ChronoUnit.DAYS.between(s, e) + 1;
-            total = total.add(BigDecimal.valueOf(days));
+            long holidayDays = holidays.stream().filter(h -> !h.isBefore(s) && !h.isAfter(e)).count();
+            total = total.add(BigDecimal.valueOf(Math.max(0, days - holidayDays)));
         }
         return total;
     }

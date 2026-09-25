@@ -4,6 +4,7 @@ import com.pwj.tracker.model.AppUser;
 import com.pwj.tracker.model.Attendance;
 import com.pwj.tracker.repository.AppUserRepository;
 import com.pwj.tracker.repository.AttendanceRepository;
+import com.pwj.tracker.repository.HolidayRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final AppUserRepository userRepository;
+    private final HolidayRepository holidayRepository;
 
     @Transactional
     public Attendance checkIn(String username, Double lat, Double lng, String address) {
@@ -125,16 +127,20 @@ public class AttendanceService {
     }
 
     public Map<String, Object> getSummary(String username) {
-        LocalDate monthStart = LocalDate.now(IST).withDayOfMonth(1);
+        LocalDate today = LocalDate.now(IST);
+        LocalDate monthStart = today.withDayOfMonth(1);
         long presentDays = attendanceRepository.countByUsernameAndStatusSince(username, "PRESENT", monthStart);
         long halfDays    = attendanceRepository.countByUsernameAndStatusSince(username, "HALF_DAY", monthStart);
         long totalDays   = attendanceRepository.countByUsernameSince(username, monthStart);
+        long holidayDays = holidayRepository.findByDateBetweenOrderByDateAsc(monthStart, today).size();
 
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("presentDays", presentDays);
         m.put("halfDays", halfDays);
         m.put("totalDays", totalDays);
-        m.put("absentDays", Math.max(0, LocalDate.now(IST).getDayOfMonth() - totalDays));
+        m.put("holidayDays", holidayDays);
+        // Declared holidays don't require a check-in, so they're excluded from the absent count.
+        m.put("absentDays", Math.max(0, today.getDayOfMonth() - totalDays - holidayDays));
         return m;
     }
 }

@@ -130,5 +130,30 @@ public class DependencyMigrationRunner implements ApplicationRunner {
                 log.warn("Could not seed salary for '{}': {}", e.getKey(), ex.getMessage());
             }
         }
+
+        // Step 9: seed the 2026 company holiday list (idempotent — skips dates already present).
+        java.util.Map<String, String> holidays2026 = new java.util.LinkedHashMap<>();
+        holidays2026.put("2026-01-01", "New Year");
+        holidays2026.put("2026-01-15", "Pongal");
+        holidays2026.put("2026-01-16", "Thiruvalluvar Day");
+        holidays2026.put("2026-01-26", "Republic Day");
+        holidays2026.put("2026-04-14", "Tamil New Year");
+        holidays2026.put("2026-05-01", "Labour Day");
+        holidays2026.put("2026-08-15", "Independence Day");
+        holidays2026.put("2026-09-14", "Ganesh Chathurthi");
+        holidays2026.put("2026-10-02", "Gandhi Jayanthi");
+        holidays2026.put("2026-10-20", "Ayudha Pooja");
+        holidays2026.put("2026-11-07", "Diwali");
+        for (java.util.Map.Entry<String, String> e : holidays2026.entrySet()) {
+            try {
+                int rows = jdbcTemplate.update(
+                    "INSERT INTO hr_holiday (date, occasion, created_by, created_at) " +
+                    "SELECT ?, ?, 'system', NOW() WHERE NOT EXISTS (SELECT 1 FROM hr_holiday WHERE date = ?)",
+                    e.getKey(), e.getValue(), e.getKey());
+                if (rows > 0) log.info("Seeded holiday {} — {}", e.getKey(), e.getValue());
+            } catch (Exception ex) {
+                log.warn("Could not seed holiday {}: {}", e.getKey(), ex.getMessage());
+            }
+        }
     }
 }
