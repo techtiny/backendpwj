@@ -26,20 +26,23 @@ public class PettyCashService {
     @Transactional
     public PettyCash create(String username, LocalDate expenseDate, String category,
                             String description, BigDecimal amount, String paymentMode,
-                            String attachmentUrl, String projectName) {
+                            String attachmentUrl, String projectName, String requestType) {
         AppUser user = userRepo.findByUsernameAndActiveTrue(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        String type = requestType != null && !requestType.isBlank() ? requestType : "PETTY_CASH";
 
-        // Up to 2 untallied requests may stay open per project at once; a 3rd
-        // requires the oldest of those to be tallied (PROOF_VERIFIED) first.
+        // Up to 2 untallied requests may stay open per project at once (within the same
+        // request type); a 3rd requires the oldest of those to be tallied (PROOF_VERIFIED) first.
         if (projectName != null && !projectName.isBlank()
-                && repo.countActiveRequestsForProject(username, projectName) >= 2) {
+                && repo.countActiveRequestsForProject(username, projectName, type) >= 2) {
             throw new RuntimeException("ACTIVE_REQUEST_EXISTS:" + projectName);
         }
 
         return repo.save(PettyCash.builder()
                 .username(username)
                 .fullName(user.getFullName())
+                .raisedByRole(user.getRole() != null ? user.getRole().name() : null)
+                .requestType(type)
                 .expenseDate(expenseDate != null ? expenseDate : LocalDate.now())
                 .category(category)
                 .description(description)
@@ -51,16 +54,16 @@ public class PettyCashService {
                 .build());
     }
 
-    public List<PettyCash> getMyEntries(String username) {
-        return repo.findByUsernameOrderByExpenseDateDescCreatedAtDesc(username);
+    public List<PettyCash> getMyEntries(String username, String requestType) {
+        return repo.findByUsernameAndRequestTypeOrderByExpenseDateDescCreatedAtDesc(username, requestType);
     }
 
-    public List<PettyCash> getPending() {
-        return repo.findByStatusOrderByCreatedAtDesc("PENDING");
+    public List<PettyCash> getPending(String requestType) {
+        return repo.findByStatusAndRequestTypeOrderByCreatedAtDesc("PENDING", requestType);
     }
 
-    public List<PettyCash> getAll() {
-        return repo.findAllByOrderByExpenseDateDescCreatedAtDesc();
+    public List<PettyCash> getAll(String requestType) {
+        return repo.findByRequestTypeOrderByExpenseDateDescCreatedAtDesc(requestType);
     }
 
     @Transactional
@@ -137,8 +140,8 @@ public class PettyCashService {
         return repo.save(entry);
     }
 
-    public List<PettyCash> getProofPendingReview() {
-        return repo.findProofSubmittedEntries();
+    public List<PettyCash> getProofPendingReview(String requestType) {
+        return repo.findProofSubmittedEntries(requestType);
     }
 
     @Transactional
@@ -152,16 +155,16 @@ public class PettyCashService {
         repo.delete(entry);
     }
 
-    public Map<String, Object> getSummary(String username) {
-        BigDecimal approved = repo.sumByUsernameAndStatus(username, "APPROVED");
-        BigDecimal pending  = repo.sumByUsernameAndStatus(username, "PENDING");
+    public Map<String, Object> getSummary(String username, String requestType) {
+        BigDecimal approved = repo.sumByUsernameAndStatus(username, "APPROVED", requestType);
+        BigDecimal pending  = repo.sumByUsernameAndStatus(username, "PENDING", requestType);
 
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("totalApproved",  approved);
         m.put("totalPending",   pending);
-        m.put("countPending",   repo.countByUsernameAndStatus(username, "PENDING"));
-        m.put("countApproved",  repo.countByUsernameAndStatus(username, "APPROVED"));
-        m.put("countRejected",  repo.countByUsernameAndStatus(username, "REJECTED"));
+        m.put("countPending",   repo.countByUsernameAndStatus(username, "PENDING", requestType));
+        m.put("countApproved",  repo.countByUsernameAndStatus(username, "APPROVED", requestType));
+        m.put("countRejected",  repo.countByUsernameAndStatus(username, "REJECTED", requestType));
         return m;
     }
 }

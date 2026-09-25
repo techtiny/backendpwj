@@ -11,25 +11,25 @@ import java.util.List;
 @Repository
 public interface PettyCashRepository extends JpaRepository<PettyCash, Long> {
 
-    List<PettyCash> findByUsernameOrderByExpenseDateDescCreatedAtDesc(String username);
+    List<PettyCash> findByUsernameAndRequestTypeOrderByExpenseDateDescCreatedAtDesc(String username, String requestType);
 
-    List<PettyCash> findByStatusOrderByCreatedAtDesc(String status);
+    List<PettyCash> findByStatusAndRequestTypeOrderByCreatedAtDesc(String status, String requestType);
 
-    List<PettyCash> findAllByOrderByExpenseDateDescCreatedAtDesc();
+    List<PettyCash> findByRequestTypeOrderByExpenseDateDescCreatedAtDesc(String requestType);
 
-    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM PettyCash p WHERE p.username = :username AND p.status = :status")
-    BigDecimal sumByUsernameAndStatus(String username, String status);
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM PettyCash p WHERE p.username = :username AND p.status = :status AND p.requestType = :requestType")
+    BigDecimal sumByUsernameAndStatus(String username, String status, String requestType);
 
-    @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.status = :status")
-    long countByUsernameAndStatus(String username, String status);
+    @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.status = :status AND p.requestType = :requestType")
+    long countByUsernameAndStatus(String username, String status, String requestType);
 
     boolean existsByUsernameAndProjectNameAndStatus(String username, String projectName, String status);
 
-    /** Count of untallied (non-REJECTED, non-PROOF_VERIFIED) requests for a project; a 3rd new request is blocked once this reaches 2 */
-    @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.projectName = :projectName AND p.status NOT IN ('PROOF_VERIFIED', 'REJECTED')")
-    long countActiveRequestsForProject(String username, String projectName);
+    /** Count of untallied (non-REJECTED, non-PROOF_VERIFIED) requests for a project, scoped to one request type; a 3rd new request is blocked once this reaches 2 */
+    @Query("SELECT COUNT(p) FROM PettyCash p WHERE p.username = :username AND p.projectName = :projectName AND p.requestType = :requestType AND p.status NOT IN ('PROOF_VERIFIED', 'REJECTED')")
+    long countActiveRequestsForProject(String username, String projectName, String requestType);
 
-    /** All entries awaiting Admin proof review */
-    @Query("SELECT p FROM PettyCash p WHERE p.status = 'PROOF_SUBMITTED' ORDER BY p.proofSubmittedAt ASC")
-    List<PettyCash> findProofSubmittedEntries();
+    /** All entries awaiting Admin proof review, scoped to one request type */
+    @Query("SELECT p FROM PettyCash p WHERE p.status = 'PROOF_SUBMITTED' AND p.requestType = :requestType ORDER BY p.proofSubmittedAt ASC")
+    List<PettyCash> findProofSubmittedEntries(String requestType);
 }

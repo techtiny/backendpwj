@@ -413,8 +413,11 @@ public class PwjEntryService {
             m.put("materialRequired", e.getMaterialRequired());
             m.put("projectName",      e.getProjectName());
             m.put("projectId",        e.getProjectId());
+            m.put("docStatus",        e.getDocStatus());
             double gross = 0;
             double gstPct = 18;
+            String completionDate = null;
+            Double finalDueDays = null, advanceAmount = null, finalPct = null, finalAmount = null;
             try {
                 JsonNode data = mapper.readTree(e.getDocData());
                 JsonNode items = data.path("items");
@@ -427,12 +430,23 @@ public class PwjEntryService {
                 double sgst = parseD(data.path("sgstPct").asText("0"));
                 double igst = parseD(data.path("igstPct").asText("0"));
                 gstPct = (cgst + sgst > 0) ? cgst + sgst : igst;
+                completionDate = data.path("completionDate").asText(null);
+                if (completionDate != null && completionDate.isBlank()) completionDate = null;
+                if (!data.path("finalDueDays").asText("").isBlank()) finalDueDays = parseD(data.path("finalDueDays").asText());
+                if (!data.path("advanceAmount").asText("").isBlank()) advanceAmount = parseD(data.path("advanceAmount").asText());
+                if (!data.path("finalPct").asText("").isBlank()) finalPct = parseD(data.path("finalPct").asText());
+                if (!data.path("finalAmount").asText("").isBlank()) finalAmount = parseD(data.path("finalAmount").asText());
             } catch (Exception ex) { /* keep defaults */ }
             double gstAmt = Math.round(gross * gstPct / 100 * 100.0) / 100.0;
             m.put("gross",        gross);
             m.put("gstPct",       gstPct);
             m.put("gstAmount",    gstAmt);
             m.put("totalPayable", Math.round((gross + gstAmt) * 100.0) / 100.0);
+            m.put("completionDate", completionDate);
+            m.put("finalDueDays",   finalDueDays);
+            m.put("advanceAmount",  advanceAmount);
+            m.put("finalPct",       finalPct);
+            m.put("finalAmount",    finalAmount);
             result.add(m);
         }
         return result;

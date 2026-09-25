@@ -32,23 +32,29 @@ public class PettyCashController {
                 ? body.get("attachmentUrl").toString() : null;
         String projectName = body.get("projectName") != null
                 ? body.get("projectName").toString() : null;
+        String requestType = body.get("requestType") != null
+                ? body.get("requestType").toString() : "PETTY_CASH";
         return ResponseEntity.ok(ApiResponse.ok("Entry created",
-                service.create(username, date, category, description, amount, paymentMode, attachmentUrl, projectName)));
+                service.create(username, date, category, description, amount, paymentMode, attachmentUrl, projectName, requestType)));
     }
 
     @GetMapping("/my/{username}")
-    public ResponseEntity<ApiResponse<List<PettyCash>>> getMyEntries(@PathVariable String username) {
-        return ResponseEntity.ok(ApiResponse.ok("My entries", service.getMyEntries(username)));
+    public ResponseEntity<ApiResponse<List<PettyCash>>> getMyEntries(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "PETTY_CASH") String requestType) {
+        return ResponseEntity.ok(ApiResponse.ok("My entries", service.getMyEntries(username, requestType)));
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<ApiResponse<List<PettyCash>>> getPending() {
-        return ResponseEntity.ok(ApiResponse.ok("Pending entries", service.getPending()));
+    public ResponseEntity<ApiResponse<List<PettyCash>>> getPending(
+            @RequestParam(defaultValue = "PETTY_CASH") String requestType) {
+        return ResponseEntity.ok(ApiResponse.ok("Pending entries", service.getPending(requestType)));
     }
 
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<PettyCash>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.ok("All entries", service.getAll()));
+    public ResponseEntity<ApiResponse<List<PettyCash>>> getAll(
+            @RequestParam(defaultValue = "PETTY_CASH") String requestType) {
+        return ResponseEntity.ok(ApiResponse.ok("All entries", service.getAll(requestType)));
     }
 
     @PutMapping("/{id}/approve")
@@ -82,8 +88,9 @@ public class PettyCashController {
 
     /** GET /api/v1/hr/petty-cash/proof-review — all entries awaiting Admin tally */
     @GetMapping("/proof-review")
-    public ResponseEntity<ApiResponse<List<PettyCash>>> getProofPendingReview() {
-        return ResponseEntity.ok(ApiResponse.ok("Proof pending review", service.getProofPendingReview()));
+    public ResponseEntity<ApiResponse<List<PettyCash>>> getProofPendingReview(
+            @RequestParam(defaultValue = "PETTY_CASH") String requestType) {
+        return ResponseEntity.ok(ApiResponse.ok("Proof pending review", service.getProofPendingReview(requestType)));
     }
 
     /** PUT /api/v1/hr/petty-cash/{id}/verify-proof — Admin tallies and verifies proof */
@@ -102,8 +109,10 @@ public class PettyCashController {
     }
 
     @GetMapping("/summary/{username}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getSummary(@PathVariable String username) {
-        return ResponseEntity.ok(ApiResponse.ok("Summary", service.getSummary(username)));
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSummary(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "PETTY_CASH") String requestType) {
+        return ResponseEntity.ok(ApiResponse.ok("Summary", service.getSummary(username, requestType)));
     }
 
     @ExceptionHandler(RuntimeException.class)

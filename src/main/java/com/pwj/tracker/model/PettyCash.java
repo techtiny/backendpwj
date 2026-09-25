@@ -30,6 +30,18 @@ public class PettyCash {
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
+    // Snapshot of the submitter's role at raise time — VP/CEO/OH Reimbursement requests
+    // show status "Submitted" instead of the full approval workflow on the frontend.
+    @Column(name = "raised_by_role", length = 50)
+    private String raisedByRole;
+
+    // PETTY_CASH | REIMBURSEMENT — which tab this request belongs to. SQL-level default so
+    // existing rows (raised before this column existed) migrate as Petty Cash, not both tabs.
+    @Column(name = "request_type", length = 20, nullable = false,
+            columnDefinition = "VARCHAR(20) NOT NULL DEFAULT 'PETTY_CASH'")
+    @Builder.Default
+    private String requestType = "PETTY_CASH";
+
     @Column(name = "expense_date", nullable = false)
     private LocalDate expenseDate;
 
