@@ -34,8 +34,12 @@ public class SalaryService {
     // count varies by cycle (28-31 days depending on the months it spans) and is computed
     // per-cycle in cycleBounds(). One casual leave is free.
     private static final int FREE_CL_PER_MONTH = 1;
+    // Each unauthorized no-show/incomplete-checkout day costs 1.5 LOP days, not 1 — a stricter
+    // penalty than leave that was actually applied for.
+    private static final BigDecimal UNAUTHORIZED_LOP_MULTIPLIER = new BigDecimal("1.5");
     // Roles Team Attendance requires a daily check-in from — only these are eligible for the
-    // Sunday/holiday auto Extra Working Day credit below.
+    // Sunday/holiday auto Extra Working Day credit below, and subject to the unauthorized-
+    // absence LOP rule.
     private static final Set<AppUser.Role> CHECKIN_ROLES = EnumSet.of(
             AppUser.Role.ENGINEER, AppUser.Role.PROJECT_MANAGER, AppUser.Role.ADMIN, AppUser.Role.PROCUREMENT);
     private static final BigDecimal PF_AMOUNT = new BigDecimal("1800");
@@ -166,7 +170,11 @@ public class SalaryService {
         Set<LocalDate> holidays = holidayRepo.findByDateBetweenOrderByDateAsc(monthStart, monthEnd)
                 .stream().map(Holiday::getDate).collect(Collectors.toSet());
         BigDecimal leaveDays = approvedLeaveDaysInMonth(u.getUsername(), monthStart, monthEnd, holidays);
-        BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO);
+        BigDecimal unauthorizedDays = unauthorizedAbsenceDays(u, monthStart, monthEnd, holidays);
+        // Unauthorized no-shows skip the free-CL grace entirely, and cost 1.5 LOP days each —
+        // stricter than leave that was actually applied for.
+        BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO)
+                .add(unauthorizedDays.multiply(UNAUTHORIZED_LOP_MULTIPLIER));
 
         BigDecimal autoExtra = autoExtraWorkingDays(u, monthStart, monthEnd, holidays);
         BigDecimal extra = a != null && a.getExtraWorkingDays() != null ? a.getExtraWorkingDays() : autoExtra;
@@ -197,13 +205,14 @@ public class SalaryService {
         BigDecimal aEmployer = aPf;
 
         String remarks = a != null && a.getRemarks() != null && !a.getRemarks().isBlank()
-                ? a.getRemarks() : autoRemark(leaveDays, lop);
+                ? a.getRemarks() : autoRemark(leaveDays, lop, unauthorizedDays);
 
         return SalaryDto.SheetRow.builder()
                 .userId(u.getId()).employeeNumber(u.getEmployeeNumber()).name(u.getFullName())
                 .designation(u.getDesignation() != null ? u.getDesignation() : String.valueOf(u.getRole()))
                 .cycleStart(monthStart).cycleEnd(monthEnd)
                 .daysInMonth(daysInMonth).leaveDays(strip(leaveDays)).freeCasualLeave(FREE_CL_PER_MONTH)
+                .unauthorizedDays(strip(unauthorizedDays))
                 .lopDays(strip(lop)).extraWorkingDays(strip(extra)).workingDays(strip(workingDays))
                 .fixedGross(money(fGross)).fixedBasic(pct(fGross, BASIC_PCT)).fixedHra(pct(fGross, HRA_PCT))
                 .fixedOther(pct(fGross, OTHER_PCT)).fixedTotalGross(money(fGross))
@@ -246,6 +255,35 @@ public class SalaryService {
         return total;
     }
 
+    /** Mon-Sat, no *complete* attendance (missing check-in, or checked in but never checked
+     *  out — same "Missing Check-Out" days Attendance's Needs Review tab flags as ABSENT), no
+     *  approved leave, not a declared holiday, and only up to yesterday (never today — it's
+     *  still in progress). Team Attendance roles only. Each such day costs 1.5 LOP days
+     *  (UNAUTHORIZED_LOP_MULTIPLIER) — the raw day count returned here is what's shown on the
+     *  sheet, the multiplier is applied where it feeds into computedLop. */
+    private BigDecimal unauthorizedAbsenceDays(AppUser u, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
+        if (!CHECKIN_ROLES.contains(u.getRole())) return BigDecimal.ZERO;
+
+        LocalDate cutoff = LocalDate.now().minusDays(1); // never judge today or the future
+        LocalDate effectiveEnd = monthEnd.isAfter(cutoff) ? cutoff : monthEnd;
+        if (effectiveEnd.isBefore(monthStart)) return BigDecimal.ZERO;
+
+        Set<LocalDate> leaveCovered = leaveCoveredDates(u.getUsername(), monthStart, effectiveEnd);
+        Set<LocalDate> completeAttendance = attendanceRepo.findByUsernameAndWorkDateBetween(u.getUsername(), monthStart, effectiveEnd)
+                .stream().filter(att -> att.getCheckOutTime() != null)
+                .map(Attendance::getWorkDate).collect(Collectors.toSet());
+
+        int count = 0;
+        for (LocalDate d = monthStart; !d.isAfter(effectiveEnd); d = d.plusDays(1)) {
+            if (d.getDayOfWeek() == DayOfWeek.SUNDAY) continue;
+            if (holidays.contains(d)) continue;
+            if (leaveCovered.contains(d)) continue;
+            if (completeAttendance.contains(d)) continue;
+            count++;
+        }
+        return BigDecimal.valueOf(count);
+    }
+
     /** Sunday or a declared holiday, with a completed check-in + check-out that day — an
      *  employee working a day they weren't required to earns it back as an Extra Working Day,
      *  unless HR has entered a manual figure for the month (which always wins). */
@@ -265,11 +303,34 @@ public class SalaryService {
         return BigDecimal.valueOf(count);
     }
 
-    private String autoRemark(BigDecimal leaveDays, BigDecimal lop) {
-        if (leaveDays.signum() == 0) return "No leave";
+    /** Every date covered by an approved leave request (any full/half-day type — PERMISSION
+     *  excluded, it's hours-based and doesn't explain a whole day with no check-in). */
+    private Set<LocalDate> leaveCoveredDates(String username, LocalDate monthStart, LocalDate monthEnd) {
+        Set<LocalDate> covered = new HashSet<>();
+        for (LeaveRequest lr : leaveRepo.findByUsernameOrderByCreatedAtDesc(username)) {
+            if (!"APPROVED".equalsIgnoreCase(lr.getStatus())) continue;
+            if ("PERMISSION".equalsIgnoreCase(lr.getLeaveType())) continue;
+            if ("HALF_DAY".equalsIgnoreCase(lr.getLeaveType())) {
+                if (lr.getFromDate() != null) covered.add(lr.getFromDate());
+                continue;
+            }
+            LocalDate from = lr.getFromDate(), to = lr.getToDate() != null ? lr.getToDate() : lr.getFromDate();
+            if (from == null) continue;
+            LocalDate s = from.isBefore(monthStart) ? monthStart : from;
+            LocalDate e = to.isAfter(monthEnd) ? monthEnd : to;
+            for (LocalDate d = s; !d.isAfter(e); d = d.plusDays(1)) covered.add(d);
+        }
+        return covered;
+    }
+
+    private String autoRemark(BigDecimal leaveDays, BigDecimal lop, BigDecimal unauthorizedDays) {
+        String suffix = unauthorizedDays.signum() > 0
+                ? " (incl. " + strip(unauthorizedDays).toPlainString() + " unauthorized absence × 1.5, no free CL)" : "";
+        if (leaveDays.signum() == 0 && unauthorizedDays.signum() == 0) return "No leave";
+        if (leaveDays.signum() == 0) return strip(lop).toPlainString() + " LOP" + suffix;
         String ld = strip(leaveDays).toPlainString();
         if (lop.signum() == 0) return ld + " day leave — within 1 CL";
-        return ld + " day leave — 1 CL free, " + strip(lop).toPlainString() + " LOP";
+        return ld + " day leave — 1 CL free, " + strip(lop).toPlainString() + " LOP" + suffix;
     }
 
     private BigDecimal pct(BigDecimal base, BigDecimal p) { return money(base.multiply(p)); }
