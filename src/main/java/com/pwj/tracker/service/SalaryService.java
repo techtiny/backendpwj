@@ -205,18 +205,13 @@ public class SalaryService {
                 .build();
     }
 
-    /** Approved leave days that fall inside the month; PERMISSION counts as hours/8. */
+    /** Approved leave days that fall inside the month; PERMISSION is excluded from LOP entirely. */
     private BigDecimal approvedLeaveDaysInMonth(String username, LocalDate monthStart, LocalDate monthEnd) {
         BigDecimal total = BigDecimal.ZERO;
         for (LeaveRequest lr : leaveRepo.findByUsernameOrderByCreatedAtDesc(username)) {
             if (!"APPROVED".equalsIgnoreCase(lr.getStatus())) continue;
             if ("COMP_OFF".equalsIgnoreCase(lr.getLeaveType())) continue; // earned by extra work — no LOP
-            if ("PERMISSION".equalsIgnoreCase(lr.getLeaveType())) {
-                if (lr.getFromDate() == null || lr.getFromDate().isBefore(monthStart) || lr.getFromDate().isAfter(monthEnd)) continue;
-                BigDecimal hrs = lr.getPermissionHours() != null ? lr.getPermissionHours() : BigDecimal.ZERO;
-                total = total.add(hrs.divide(BigDecimal.valueOf(8), 2, RoundingMode.HALF_UP));
-                continue;
-            }
+            if ("PERMISSION".equalsIgnoreCase(lr.getLeaveType())) continue; // hours-based, doesn't count toward LOP
             if ("HALF_DAY".equalsIgnoreCase(lr.getLeaveType())) {
                 if (lr.getFromDate() == null || lr.getFromDate().isBefore(monthStart) || lr.getFromDate().isAfter(monthEnd)) continue;
                 total = total.add(new BigDecimal("0.5"));
