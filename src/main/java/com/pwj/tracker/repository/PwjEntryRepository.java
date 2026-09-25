@@ -96,6 +96,13 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
     @Query("SELECT COUNT(e) FROM PwjEntry e WHERE e.dependency = :dependency AND e.status = :status AND LOWER(e.raisedBy) = LOWER(:raisedBy) AND e.isTestData = :isTestData")
     long countByDependencyAndStatusAndRaisedBy(@Param("dependency") String dependency, @Param("status") PwjEntry.EntryStatus status, @Param("raisedBy") String raisedBy, @Param("isTestData") Boolean isTestData);
 
+    /** PRs raised by one person (by name, matching how raisedBy is stored) within a date range —
+     *  used for the Employee profile's "PR raised" stat. */
+    @Query("SELECT COUNT(e) FROM PwjEntry e WHERE LOWER(e.raisedBy) = LOWER(:raisedBy) " +
+           "AND e.isTestData = false AND e.createdAt BETWEEN :from AND :to")
+    long countByRaisedByAndCreatedAtBetween(@Param("raisedBy") String raisedBy,
+                                             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
     @Query("SELECT DISTINCT e.projectName FROM PwjEntry e ORDER BY e.projectName")
     List<String> findDistinctProjectNames();
 
