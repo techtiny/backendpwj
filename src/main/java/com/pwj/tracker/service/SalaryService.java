@@ -172,7 +172,8 @@ public class SalaryService {
         BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO)
                 .add(unauthorizedDays);
 
-        BigDecimal extra = a != null && a.getExtraWorkingDays() != null ? a.getExtraWorkingDays() : BigDecimal.ZERO;
+        BigDecimal autoExtra = autoExtraWorkingDays(u, monthStart, monthEnd, holidays);
+        BigDecimal extra = a != null && a.getExtraWorkingDays() != null ? a.getExtraWorkingDays() : autoExtra;
         BigDecimal lop = a != null && a.getManualLopDays() != null ? a.getManualLopDays() : computedLop;
 
         BigDecimal workingDays;
@@ -270,6 +271,25 @@ public class SalaryService {
             if (leaveCovered.contains(d)) continue;
             if (checkedIn.contains(d)) continue;
             count++;
+        }
+        return BigDecimal.valueOf(count);
+    }
+
+    /** Sunday or a declared holiday, with a completed check-in + check-out that day — an
+     *  employee working a day they weren't required to earns it back as an Extra Working Day,
+     *  unless HR has entered a manual figure for the month (which always wins). */
+    private BigDecimal autoExtraWorkingDays(AppUser u, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
+        if (!CHECKIN_ROLES.contains(u.getRole())) return BigDecimal.ZERO;
+
+        Map<LocalDate, Attendance> byDate = attendanceRepo.findByUsernameAndWorkDateBetween(u.getUsername(), monthStart, monthEnd)
+                .stream().collect(Collectors.toMap(Attendance::getWorkDate, x -> x, (x, y) -> x));
+
+        int count = 0;
+        for (LocalDate d = monthStart; !d.isAfter(monthEnd); d = d.plusDays(1)) {
+            boolean nonWorkingDay = d.getDayOfWeek() == DayOfWeek.SUNDAY || holidays.contains(d);
+            if (!nonWorkingDay) continue;
+            Attendance att = byDate.get(d);
+            if (att != null && att.getCheckInTime() != null && att.getCheckOutTime() != null) count++;
         }
         return BigDecimal.valueOf(count);
     }
