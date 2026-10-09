@@ -170,11 +170,13 @@ public class PwjEntryService {
         if (req.getProjectId() != null) entry.setProjectId(req.getProjectId());
         entry.setBoqNo(req.getBoqNo());
         entry.setMaterialRequired(req.getMaterialRequired());
-        entry.setSpecification(req.getSpecification());
-        entry.setBrand(req.getBrand());
-        entry.setUnit(req.getUnit());
-        entry.setQuantity(req.getQuantity());
-        entry.setDateOfRequirement(req.getDateOfRequirement());
+        // These fields aren't sent by every caller (e.g. the PR-clubbing merge only sends
+        // a handful of fields) — a null here must never wipe what's already saved.
+        if (req.getSpecification() != null) entry.setSpecification(req.getSpecification());
+        if (req.getBrand() != null) entry.setBrand(req.getBrand());
+        if (req.getUnit() != null) entry.setUnit(req.getUnit());
+        if (req.getQuantity() != null) entry.setQuantity(req.getQuantity());
+        if (req.getDateOfRequirement() != null) entry.setDateOfRequirement(req.getDateOfRequirement());
         if (req.getImageReference() != null) entry.setImageReference(req.getImageReference());
         entry.setApprovalStatus(req.getApprovalStatus());
         entry.setVendor(req.getVendor());
@@ -187,7 +189,7 @@ public class PwjEntryService {
         } else {
             entry.setStatus(req.getStatus());
         }
-        entry.setRemarks(req.getRemarks());
+        if (req.getRemarks() != null) entry.setRemarks(req.getRemarks());
         if (req.getDocData() != null) entry.setDocData(req.getDocData());
         if (req.getDocNumber() != null && !req.getDocNumber().isBlank()) entry.setDocNumber(req.getDocNumber());
         if (req.getDocStatus() != null) entry.setDocStatus(req.getDocStatus());
