@@ -183,8 +183,10 @@ public class PwjEntryService {
         // Only overwrite pwjIssued if explicitly provided — never let a null wipe it
         if (req.getPwjIssued() != null) entry.setPwjIssued(req.getPwjIssued());
         entry.setPwjType(req.getPwjType());
-        entry.setDeliveredDate(req.getDeliveredDate());
+        // deliveredDate is also set via the dedicated deliveryUpdate() endpoint — a caller
+        // here that doesn't supply it (e.g. the PR-clubbing merge) must not wipe it.
         if (req.getDeliveredDate() != null) {
+            entry.setDeliveredDate(req.getDeliveredDate());
             entry.setStatus(PwjEntry.EntryStatus.CLOSED);
         } else {
             entry.setStatus(req.getStatus());
