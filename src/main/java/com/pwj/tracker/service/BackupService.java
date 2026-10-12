@@ -77,8 +77,18 @@ public class BackupService {
     // generating + emailing a multi-GB backup takes far longer than that, so the
     // HTTP response can't wait on it. Fire-and-forget in a background thread;
     // any failure is only logged (same as the weekly scheduled run).
+    //
+    // The common ForkJoinPool thread CompletableFuture.runAsync uses doesn't carry
+    // this Spring Boot executable jar's classloader as its context classloader, so
+    // jakarta.mail's ServiceLoader-based provider lookup (StreamProvider) fails
+    // there even though it works fine on a normal request thread. Propagate it
+    // explicitly so Session creation can find the provider.
     public void triggerBackupAsync() {
-        java.util.concurrent.CompletableFuture.runAsync(this::triggerBackupQuiet);
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            Thread.currentThread().setContextClassLoader(cl);
+            triggerBackupQuiet();
+        });
     }
 
     // ── Full ZIP backup (SQL + Excel + uploads + metadata) ───────────────────
