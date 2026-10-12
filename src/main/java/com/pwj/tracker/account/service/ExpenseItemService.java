@@ -392,11 +392,26 @@ public class ExpenseItemService {
             if (v.getName() != null) vendorsByName.putIfAbsent(v.getName().trim().toLowerCase(), v);
         });
         Map<String, BigDecimal[]> poCache = new HashMap<>();
+        // docNumber -> clubbed PRs, built once from getDocSummaries() rather than per row —
+        // this is what groups a clubbed PR group's entries visually in the Accounts tracker.
+        Map<String, Object> clubbedByDocNumber = new HashMap<>();
+        for (Map<String, Object> doc : pwjEntryService.getDocSummaries()) {
+            Object docNumber = doc.get("docNumber");
+            Object clubbedPrs = doc.get("clubbedPrs");
+            if (docNumber != null && clubbedPrs instanceof List<?> l && !l.isEmpty()) {
+                clubbedByDocNumber.put((String) docNumber, clubbedPrs);
+            }
+        }
         return repo.findSentForPayment().stream().map(e -> {
             ExpenseItemDto d = toDto(e, poCache);
             d.setProjectName(names.getOrDefault(e.getProjectId(), "Unknown"));
             enrichBeneficiary(d, e.getPartyName() == null ? null
                     : vendorsByName.get(e.getPartyName().trim().toLowerCase()));
+            if (e.getRefNo() != null) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> clubbed = (List<Map<String, Object>>) clubbedByDocNumber.get(e.getRefNo());
+                d.setClubbedPrs(clubbed);
+            }
             return d;
         }).toList();
     }

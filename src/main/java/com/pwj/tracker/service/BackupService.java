@@ -2,7 +2,6 @@ package com.pwj.tracker.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import jakarta.mail.util.ByteArrayDataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,17 +50,35 @@ public class BackupService {
     public void sendWeeklyBackup() { triggerBackupQuiet(); }
 
     // ── Manual email trigger ──────────────────────────────────────────────────
+    // Streams the ZIP to a temp file on disk (not an in-memory byte[]) — with the
+    // uploads volume now at ~1.7GB, buffering the whole archive in the JVM heap
+    // risks an OutOfMemoryError on top of the gateway-timeout problem below.
     public void triggerBackup() throws Exception {
         log.info("Starting backup — {}", LocalDateTime.now(IST));
-        byte[] zipBytes = generateFullBackupZip();
-        log.info("Full backup ZIP generated: {} bytes", zipBytes.length);
-        sendBackupEmail(zipBytes);
-        log.info("Backup sent to {}", backupTo);
+        Path tmp = Files.createTempFile("pwj-backup-", ".zip");
+        try {
+            try (OutputStream out = Files.newOutputStream(tmp)) {
+                writeFullBackupZip(out);
+            }
+            log.info("Full backup ZIP generated: {} bytes", Files.size(tmp));
+            sendBackupEmail(tmp);
+            log.info("Backup sent to {}", backupTo);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
     }
 
     private void triggerBackupQuiet() {
         try { triggerBackup(); }
         catch (Exception e) { log.error("Weekly backup failed", e); }
+    }
+
+    // POST /trigger-backup must return before Railway's gateway timeout (~30s) —
+    // generating + emailing a multi-GB backup takes far longer than that, so the
+    // HTTP response can't wait on it. Fire-and-forget in a background thread;
+    // any failure is only logged (same as the weekly scheduled run).
+    public void triggerBackupAsync() {
+        java.util.concurrent.CompletableFuture.runAsync(this::triggerBackupQuiet);
     }
 
     // ── Full ZIP backup (SQL + Excel + uploads + metadata) ───────────────────
@@ -311,7 +328,7 @@ public class BackupService {
     }
 
     // ── Email ─────────────────────────────────────────────────────────────────
-    private void sendBackupEmail(byte[] zipBytes) throws MessagingException {
+    private void sendBackupEmail(Path zipFile) throws MessagingException {
         String date       = LocalDate.now(IST).format(DateTimeFormatter.ofPattern("dd-MMM-yyyy"));
         String dateSuffix = LocalDate.now(IST).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
@@ -347,7 +364,7 @@ public class BackupService {
 
         helper.addAttachment(
             "PWJ-FullBackup-" + dateSuffix + ".zip",
-            new ByteArrayDataSource(zipBytes, "application/zip")
+            new jakarta.activation.FileDataSource(zipFile.toFile())
         );
 
         mailSender.send(message);

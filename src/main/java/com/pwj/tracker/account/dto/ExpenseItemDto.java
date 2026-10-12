@@ -54,6 +54,7 @@ public class ExpenseItemDto {
     private String gstRemarks;
     private BigDecimal poValue;
     private BigDecimal poBalanceRemaining;
+    private List<java.util.Map<String, Object>> clubbedPrs;
     private String projectName; // populated only by the cross-project "sent for payment" listing
     // Beneficiary bank details — resolved from the Vendor record by name, populated only by the
     // cross-project "sent for payment" listing (used to build the bank bulk-transfer export).
@@ -163,6 +164,8 @@ public class ExpenseItemDto {
     public void setPoValue(BigDecimal poValue) { this.poValue = poValue; }
     public BigDecimal getPoBalanceRemaining() { return poBalanceRemaining; }
     public void setPoBalanceRemaining(BigDecimal poBalanceRemaining) { this.poBalanceRemaining = poBalanceRemaining; }
+    public List<java.util.Map<String, Object>> getClubbedPrs() { return clubbedPrs; }
+    public void setClubbedPrs(List<java.util.Map<String, Object>> clubbedPrs) { this.clubbedPrs = clubbedPrs; }
     public String getProjectName() { return projectName; }
     public void setProjectName(String projectName) { this.projectName = projectName; }
     public String getBenAccountNumber() { return benAccountNumber; }

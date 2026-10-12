@@ -484,6 +484,21 @@ public class PwjEntryService {
                         ? docs.get(0).path("docNumber").asText() : e.getDocNumber())
                     : e.getDocNumber();
 
+            // Clubbed PRs (clubbedEntryIds, see submitGenDoc/unclubEntry in the frontend) live
+            // at the top level of docData, shared by every sub-doc under this entry — the whole
+            // document represents all of them combined, not just the entry's own PR.
+            List<Map<String, Object>> clubbedPrs = new ArrayList<>();
+            if (top.has("clubbedEntryIds") && top.get("clubbedEntryIds").isArray() && top.get("clubbedEntryIds").size() > 0) {
+                List<Long> clubbedIds = new ArrayList<>();
+                for (JsonNode n : top.get("clubbedEntryIds")) clubbedIds.add(n.asLong());
+                for (PwjEntry sibling : repository.findAllById(clubbedIds)) {
+                    Map<String, Object> cp = new LinkedHashMap<>();
+                    cp.put("id", sibling.getId());
+                    cp.put("materialRequired", sibling.getMaterialRequired());
+                    clubbedPrs.add(cp);
+                }
+            }
+
             for (int i = 0; i < docs.size(); i++) {
                 JsonNode data = docs.get(i);
                 Map<String, Object> m = new LinkedHashMap<>();
@@ -499,6 +514,7 @@ public class PwjEntryService {
                 m.put("entryId",          e.getId());
                 m.put("baseDocNumber",    baseDocNumber);
                 m.put("isAdditionalPo",   i > 0);
+                m.put("clubbedPrs",       clubbedPrs);
 
                 double gross = 0;
                 double gstPct = 18;

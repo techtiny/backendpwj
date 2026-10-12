@@ -37,16 +37,19 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.ok("Report email triggered", "Check inbox at configured recipient"));
     }
 
-    /** POST /trigger-backup — send full backup ZIP via email */
+    /**
+     * POST /trigger-backup — kick off a full backup ZIP + email in the background and
+     * return immediately. Generating + emailing it (DB dump + ~1.7GB of uploads) takes far
+     * longer than Railway's gateway timeout (~30s), so the HTTP response can't wait on it —
+     * doing so previously made this endpoint 502 on every call. Any failure is only logged
+     * (check server logs), same as the weekly scheduled run.
+     */
     @PostMapping("/trigger-backup")
     public ResponseEntity<ApiResponse<String>> triggerBackup() {
-        try {
-            backupService.triggerBackup();
-            return ResponseEntity.ok(ApiResponse.ok("Backup sent",
-                "Full backup ZIP (DB + uploads + Excel) emailed to " + backupService.getBackupTo()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(ApiResponse.error("Backup failed: " + e.getMessage()));
-        }
+        backupService.triggerBackupAsync();
+        return ResponseEntity.ok(ApiResponse.ok("Backup started",
+            "Full backup ZIP (DB + uploads + Excel) is being generated and will be emailed to " +
+            backupService.getBackupTo() + " shortly"));
     }
 
     /** GET /download-backup — stream full backup ZIP directly (low memory, avoids gateway timeouts) */
