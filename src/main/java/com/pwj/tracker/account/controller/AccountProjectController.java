@@ -86,8 +86,10 @@ public class AccountProjectController {
 
         // Balance Due (top stat) = Work Order Value (Quote Gross) - Collection Received
         BigDecimal balanceDue = quoteGross.subtract(collectionReceived);
-        // Balance as on Date (bottom banner) = Collection Received - Total Balance to be Paid (Actual)
-        BigDecimal balanceAsOnDate = collectionReceived.subtract(balanceActual);
+        // Balance as on Date (bottom banner) = Total Received - Total Paid Expenses (Actual).
+        // Matches the reference Summary sheet's formula (Balance as on date = C21 - D28, i.e.
+        // collection received minus total PAID expenses — not minus the balance still owed).
+        BigDecimal balanceAsOnDate = collectionReceived.subtract(totPaid);
 
         // Total Expenses for the Project = Total Paid Expenses + Total Balance to be Paid (per column)
         BigDecimal totalExpensesPwj    = totPwj.add(balancePwj);
