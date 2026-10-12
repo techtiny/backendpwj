@@ -228,6 +228,18 @@ public class ExpenseItemService {
     @Transactional
     public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks,
                                                  String paymentMadeAgainst, String paymentStage) {
+        return sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage, null);
+    }
+
+    /**
+     * @param docNumber optional — targets one specific sub-doc of a multi-vendor/multi-PO
+     *                  entry (e.g. an Additional PO like "WO-2627-0004A") instead of the
+     *                  entry's own base doc number. Null/blank keeps the original behavior
+     *                  (send against the entry's own doc number).
+     */
+    @Transactional
+    public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks,
+                                                 String paymentMadeAgainst, String paymentStage, String docNumber) {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("Amount must be greater than zero");
         }
@@ -243,6 +255,7 @@ public class ExpenseItemService {
         if (entry.getProjectName() == null || entry.getProjectName().isBlank()) {
             throw new IllegalArgumentException("PWJ entry #" + pwjEntryId + " has no project name");
         }
+        String targetDocNumber = (docNumber != null && !docNumber.isBlank()) ? docNumber.trim() : entry.getDocNumber();
         // The Account module's projects are a separate list from the PWJ tracker's free-text
         // project names — match by name the same way GET /expenses/pwj-docs?projectId= does in
         // reverse. An issued PO whose project was never set up on the Account side can't be sent.
@@ -252,30 +265,37 @@ public class ExpenseItemService {
                         "No Account project named \"" + entry.getProjectName() + "\" — ask Accounts to set it up first"));
 
         Map<String, Object> summary = pwjEntryService.getDocSummaries().stream()
-                .filter(d -> entry.getDocNumber().equals(d.get("docNumber")))
+                .filter(d -> targetDocNumber.equals(d.get("docNumber")))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "Could not resolve document totals for " + entry.getDocNumber()));
+                        "Could not resolve document totals for " + targetDocNumber));
+
+        // A specifically-targeted sub-doc (an Additional PO) must be VP-approved on its own —
+        // the entry-level `issued` check above only guarantees the entry's base doc is issued.
+        if (docNumber != null && !docNumber.isBlank() && !"VP_APPROVED".equals(summary.get("docStatus"))) {
+            throw new IllegalArgumentException("Document " + targetDocNumber + " has not been VP-approved yet");
+        }
 
         BigDecimal poValue = toBigDecimal(summary.get("totalPayable"));
         BigDecimal gross    = toBigDecimal(summary.get("gross"));
         BigDecimal gstPct   = toBigDecimal(summary.get("gstPct"));
         BigDecimal gstAmt   = toBigDecimal(summary.get("gstAmount"));
+        String vendor       = summary.get("vendor") != null ? String.valueOf(summary.get("vendor")) : entry.getVendor();
 
-        BigDecimal alreadySentPo = repo.sumSentForPo(accountProjectId, entry.getDocNumber());
+        BigDecimal alreadySentPo = repo.sumSentForPo(accountProjectId, targetDocNumber);
         BigDecimal newTotalForPo = alreadySentPo.add(amount);
         if (newTotalForPo.compareTo(poValue) > 0) {
             throw new IllegalArgumentException(
                     "Sending " + amount + " would exceed the PO value (" + poValue + ") for " +
-                    entry.getDocNumber() + " — already sent " + alreadySentPo);
+                    targetDocNumber + " — already sent " + alreadySentPo);
         }
 
         ExpenseItem e = new ExpenseItem();
         e.setProjectId(accountProjectId);
         e.setCategory(defaultCategoryFor(entry.getPwjType()));
         e.setDescription(entry.getMaterialRequired());
-        e.setPartyName(entry.getVendor());
-        e.setRefNo(entry.getDocNumber());
+        e.setPartyName(vendor);
+        e.setRefNo(targetDocNumber);
         e.setPwjGross(gross);
         e.setGstPercent(gstPct);
         e.setPwjGstAmount(gstAmt);
@@ -302,9 +322,19 @@ public class ExpenseItemService {
      * matched, in which case {@code available} is 0 and the real check happens on submit.
      */
     public Map<String, Object> getPwjEntryPaymentAvailability(Long pwjEntryId) {
+        return getPwjEntryPaymentAvailability(pwjEntryId, null);
+    }
+
+    /**
+     * @param docNumber optional — targets one specific sub-doc of a multi-vendor/multi-PO
+     *                  entry (e.g. an Additional PO like "WO-2627-0004A"). Null/blank falls
+     *                  back to the entry's own base doc number.
+     */
+    public Map<String, Object> getPwjEntryPaymentAvailability(Long pwjEntryId, String docNumber) {
         PwjEntryResponse entry = pwjEntryService.getById(pwjEntryId);
+        String targetDocNumber = (docNumber != null && !docNumber.isBlank()) ? docNumber.trim() : entry.getDocNumber();
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("docNumber", entry.getDocNumber());
+        out.put("docNumber", targetDocNumber);
         out.put("vendor", entry.getVendor());
         out.put("poValue", BigDecimal.ZERO);
         out.put("alreadySent", BigDecimal.ZERO);
@@ -314,7 +344,7 @@ public class ExpenseItemService {
         boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
                 || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
         if (!issued
-                || entry.getDocNumber() == null || entry.getDocNumber().isBlank()
+                || targetDocNumber == null || targetDocNumber.isBlank()
                 || entry.getProjectName() == null || entry.getProjectName().isBlank()) {
             return out;
         }
@@ -323,18 +353,23 @@ public class ExpenseItemService {
                 .map(com.pwj.tracker.model.Project::getId)
                 .orElse(null);
         Map<String, Object> summary = pwjEntryService.getDocSummaries().stream()
-                .filter(d -> entry.getDocNumber().equals(d.get("docNumber")))
+                .filter(d -> targetDocNumber.equals(d.get("docNumber")))
                 .findFirst()
                 .orElse(null);
         if (summary != null) {
             out.put("poValue", toBigDecimal(summary.get("totalPayable")));
+            if (summary.get("vendor") != null) out.put("vendor", summary.get("vendor"));
+        }
+        // A specifically-targeted sub-doc must be VP-approved on its own before it can be sent.
+        if (docNumber != null && !docNumber.isBlank() && summary != null && !"VP_APPROVED".equals(summary.get("docStatus"))) {
+            return out;
         }
         if (accountProjectId == null || summary == null) {
             return out;
         }
 
         BigDecimal poValue = toBigDecimal(summary.get("totalPayable"));
-        BigDecimal alreadySent = repo.sumSentForPo(accountProjectId, entry.getDocNumber());
+        BigDecimal alreadySent = repo.sumSentForPo(accountProjectId, targetDocNumber);
         BigDecimal available = poValue.subtract(alreadySent).max(BigDecimal.ZERO);
         out.put("poValue", poValue);
         out.put("alreadySent", alreadySent);

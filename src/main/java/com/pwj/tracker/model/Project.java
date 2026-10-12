@@ -55,6 +55,21 @@ public class Project {
     @Column(name = "quote_doc_url", length = 500)
     private String quoteDocUrl;
 
+    // Operations module: the BOQ spreadsheet uploaded for this project, kept
+    // so it doesn't need to be re-uploaded on every visit.
+    @Column(name = "boq_doc_url", length = 500)
+    private String boqDocUrl;
+
+    @Column(name = "boq_file_name", length = 255)
+    private String boqFileName;
+
+    // JSON object { "<sheet name>": ["<qualified label>", ...] } — which BOQ
+    // line items have already been turned into a PR, so they can't be
+    // selected again on a later visit. Opaque to the backend; the frontend
+    // owns the structure.
+    @Column(name = "boq_used_labels", columnDefinition = "TEXT")
+    private String boqUsedLabels;
+
     @Column(name = "quote_total_value", precision = 15, scale = 2)
     private BigDecimal quoteTotalValue;
 

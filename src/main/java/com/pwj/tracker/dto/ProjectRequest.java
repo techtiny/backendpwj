@@ -22,6 +22,9 @@ public class ProjectRequest {
     private BigDecimal quoteValue;
     private Integer quoteGstPct;
     private String quoteDocUrl;
+    private String boqDocUrl;
+    private String boqFileName;
+    private String boqUsedLabels;
     private BigDecimal additionalWoValue;
     private Integer additionalWoGstPct;
     private String additionalWoDocUrl;

@@ -102,8 +102,22 @@ public class BackupService {
             // 4. All uploaded files (images + documents), streamed file by file
             Path uploadsPath = Paths.get(uploadDir).toAbsolutePath();
             if (Files.exists(uploadsPath)) {
+                // The walk itself (hasNext/next on the lazy iterator), not just the
+                // per-file copy, can throw (e.g. an unreadable subfolder) — that
+                // would otherwise escape the inner try/catch below and abort the
+                // whole archive, truncating whatever was already streamed to the
+                // client on the direct-download endpoint.
                 try (Stream<Path> files = Files.walk(uploadsPath)) {
-                    for (Path file : (Iterable<Path>) files.filter(Files::isRegularFile)::iterator) {
+                    Iterator<Path> it = files.filter(Files::isRegularFile).iterator();
+                    while (true) {
+                        Path file;
+                        try {
+                            if (!it.hasNext()) break;
+                            file = it.next();
+                        } catch (UncheckedIOException ex) {
+                            log.warn("Backup: stopped walking uploads early: {}", ex.getMessage());
+                            break;
+                        }
                         String rel = uploadsPath.relativize(file).toString().replace("\\", "/");
                         try {
                             zip.putNextEntry(new ZipEntry("uploads/" + rel));
@@ -237,45 +251,55 @@ public class BackupService {
                 pw.println("-- Table: " + table);
                 pw.println("-- ----------------------------------------------------------------");
 
-                try (Statement st = conn.createStatement();
-                     ResultSet rs = st.executeQuery("SHOW CREATE TABLE `" + table + "`")) {
-                    if (rs.next()) {
-                        pw.println("DROP TABLE IF EXISTS `" + table + "`;");
-                        pw.println(rs.getString(2) + ";");
-                        pw.println();
-                    }
-                }
-
-                try (Statement st = conn.createStatement();
-                     ResultSet rs = st.executeQuery("SELECT * FROM `" + table + "`")) {
-                    ResultSetMetaData rsMeta = rs.getMetaData();
-                    int colCount = rsMeta.getColumnCount();
-                    int rowCount = 0;
-                    while (rs.next()) {
-                        StringBuilder sb = new StringBuilder("INSERT INTO `").append(table).append("` VALUES (");
-                        for (int i = 1; i <= colCount; i++) {
-                            if (i > 1) sb.append(", ");
-                            Object val = rs.getObject(i);
-                            if (val == null) {
-                                sb.append("NULL");
-                            } else if (val instanceof Number) {
-                                sb.append(val);
-                            } else if (val instanceof Boolean) {
-                                sb.append(((Boolean) val) ? 1 : 0);
-                            } else {
-                                String s = val.toString()
-                                        .replace("\\", "\\\\")
-                                        .replace("'",  "\\'")
-                                        .replace("\n", "\\n")
-                                        .replace("\r", "\\r");
-                                sb.append("'").append(s).append("'");
-                            }
+                // A single table failing (lock timeout, odd column type, transient
+                // connection hiccup) must not abort the whole dump — the download
+                // endpoint streams straight to the client as this runs, so by the
+                // time an exception reached the caller the response was already
+                // committed, leaving the client with a truncated, unopenable ZIP.
+                try {
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SHOW CREATE TABLE `" + table + "`")) {
+                        if (rs.next()) {
+                            pw.println("DROP TABLE IF EXISTS `" + table + "`;");
+                            pw.println(rs.getString(2) + ";");
+                            pw.println();
                         }
-                        sb.append(");");
-                        pw.println(sb);
-                        rowCount++;
                     }
-                    if (rowCount > 0) pw.println("-- " + rowCount + " row(s) in " + table);
+
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT * FROM `" + table + "`")) {
+                        ResultSetMetaData rsMeta = rs.getMetaData();
+                        int colCount = rsMeta.getColumnCount();
+                        int rowCount = 0;
+                        while (rs.next()) {
+                            StringBuilder sb = new StringBuilder("INSERT INTO `").append(table).append("` VALUES (");
+                            for (int i = 1; i <= colCount; i++) {
+                                if (i > 1) sb.append(", ");
+                                Object val = rs.getObject(i);
+                                if (val == null) {
+                                    sb.append("NULL");
+                                } else if (val instanceof Number) {
+                                    sb.append(val);
+                                } else if (val instanceof Boolean) {
+                                    sb.append(((Boolean) val) ? 1 : 0);
+                                } else {
+                                    String s = val.toString()
+                                            .replace("\\", "\\\\")
+                                            .replace("'",  "\\'")
+                                            .replace("\n", "\\n")
+                                            .replace("\r", "\\r");
+                                    sb.append("'").append(s).append("'");
+                                }
+                            }
+                            sb.append(");");
+                            pw.println(sb);
+                            rowCount++;
+                        }
+                        if (rowCount > 0) pw.println("-- " + rowCount + " row(s) in " + table);
+                    }
+                } catch (Exception ex) {
+                    log.warn("Backup: skipped table {} due to error: {}", table, ex.getMessage());
+                    pw.println("-- SKIPPED — backup could not dump this table: " + ex.getMessage());
                 }
                 pw.println();
             }

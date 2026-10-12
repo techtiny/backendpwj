@@ -112,9 +112,11 @@ public class ExpenseItemController {
 
     /**
      * POST /api/expenses/send-pwj-for-payment
-     * Body: { "pwjEntryId": 123, "amount": 50000 }
+     * Body: { "pwjEntryId": 123, "amount": 50000, "docNumber": "WO-2627-0004A" }
      * Procurement: send a payment request straight from an issued PWJ entry — vendor,
-     * doc number and project are auto-derived from the entry.
+     * doc number and project are auto-derived from the entry. "docNumber" is optional and
+     * targets one specific sub-doc of a multi-vendor/multi-PO entry (e.g. an Additional PO);
+     * omit it to send against the entry's own base doc number as before.
      */
     @PostMapping("/send-pwj-for-payment")
     public ResponseEntity<ExpenseItemDto> sendPwjEntryForPayment(@RequestBody Map<String, Object> body) {
@@ -123,17 +125,20 @@ public class ExpenseItemController {
         String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
         String paymentMadeAgainst = body.get("paymentMadeAgainst") != null ? String.valueOf(body.get("paymentMadeAgainst")) : null;
         String paymentStage = body.get("paymentStage") != null ? String.valueOf(body.get("paymentStage")) : null;
-        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage));
+        String docNumber = body.get("docNumber") != null ? String.valueOf(body.get("docNumber")) : null;
+        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage, docNumber));
     }
 
     /**
-     * GET /api/expenses/pwj-entry/{id}/payment-availability
+     * GET /api/expenses/pwj-entry/{id}/payment-availability?docNumber=WO-2627-0004A
      * Procurement: how much of this issued PWJ doc's value is still available to send for
-     * payment — { docNumber, vendor, poValue, alreadySent, available, resolved }.
+     * payment — { docNumber, vendor, poValue, alreadySent, available, resolved }. "docNumber"
+     * is optional and targets one specific sub-doc of a multi-vendor/multi-PO entry.
      */
     @GetMapping("/pwj-entry/{id}/payment-availability")
-    public ResponseEntity<Map<String, Object>> getPwjEntryPaymentAvailability(@PathVariable Long id) {
-        return ResponseEntity.ok(service.getPwjEntryPaymentAvailability(id));
+    public ResponseEntity<Map<String, Object>> getPwjEntryPaymentAvailability(
+            @PathVariable Long id, @RequestParam(required = false) String docNumber) {
+        return ResponseEntity.ok(service.getPwjEntryPaymentAvailability(id, docNumber));
     }
 
     /**

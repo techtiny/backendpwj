@@ -2,17 +2,21 @@ package com.pwj.tracker.service;
 
 import com.pwj.tracker.model.AppUser;
 import com.pwj.tracker.model.Attendance;
+import com.pwj.tracker.model.LeaveRequest;
 import com.pwj.tracker.repository.AppUserRepository;
 import com.pwj.tracker.repository.AttendanceRepository;
 import com.pwj.tracker.repository.HolidayRepository;
+import com.pwj.tracker.repository.LeaveRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class AttendanceService {
     private final AttendanceRepository attendanceRepository;
     private final AppUserRepository userRepository;
     private final HolidayRepository holidayRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     @Transactional
     public Attendance checkIn(String username, Double lat, Double lng, String address) {
@@ -77,15 +82,18 @@ public class AttendanceService {
     }
 
     public List<Attendance> getUserHistory(String username) {
-        return attendanceRepository.findByUsernameOrderByWorkDateDesc(username);
+        List<Attendance> real = attendanceRepository.findByUsernameOrderByWorkDateDesc(username);
+        return fillLeaveGaps(real, null);
     }
 
     public List<Attendance> getTodayAll() {
-        return attendanceRepository.findByWorkDateOrderByFullNameAsc(LocalDate.now(IST));
+        List<Attendance> real = attendanceRepository.findByWorkDateOrderByFullNameAsc(LocalDate.now(IST));
+        return fillLeaveGaps(real, LocalDate.now(IST));
     }
 
     public List<Attendance> getAll() {
-        return attendanceRepository.findAllByOrderByWorkDateDescCheckInTimeDesc();
+        List<Attendance> real = attendanceRepository.findAllByOrderByWorkDateDescCheckInTimeDesc();
+        return fillLeaveGaps(real, null);
     }
 
     public List<Attendance> getFieldStaffAttendance() {
@@ -93,7 +101,51 @@ public class AttendanceService {
         List<String> usernames = userRepository.findByRoleInAndActiveTrue(fieldRoles)
                 .stream().map(AppUser::getUsername).toList();
         if (usernames.isEmpty()) return List.of();
-        return attendanceRepository.findByUsernameInOrderByWorkDateDescCheckInTimeDesc(usernames);
+        List<Attendance> real = attendanceRepository.findByUsernameInOrderByWorkDateDescCheckInTimeDesc(usernames);
+        return fillLeaveGaps(real, null);
+    }
+
+    /**
+     * An employee on approved leave with no check-in that day previously showed
+     * up as a silent gap — nothing in the list at all. This fills in a synthetic
+     * (never persisted) ABSENT row for every approved-leave date that has no
+     * real Attendance row, so leave days are visible instead of invisible.
+     * Sundays/holidays and PERMISSION/HALF_DAY leave (the employee still
+     * attends most of the day) are excluded — only a genuinely missing row on
+     * an otherwise-working day gets a synthetic placeholder. Pass `onlyDate`
+     * to scope this to a single day (e.g. "today"); null fills every date in
+     * range for every approved leave found.
+     */
+    private List<Attendance> fillLeaveGaps(List<Attendance> real, LocalDate onlyDate) {
+        Set<String> covered = real.stream()
+                .map(a -> a.getUsername() + "|" + a.getWorkDate())
+                .collect(Collectors.toSet());
+
+        List<LeaveRequest> approved = leaveRequestRepository.findByStatusOrderByCreatedAtDesc("APPROVED");
+        if (approved.isEmpty()) return real;
+
+        List<Attendance> merged = new ArrayList<>(real);
+        long syntheticId = -1;
+        for (LeaveRequest lr : approved) {
+            if ("PERMISSION".equals(lr.getLeaveType()) || "HALF_DAY".equals(lr.getLeaveType())) continue;
+            for (LocalDate d = lr.getFromDate(); !d.isAfter(lr.getToDate()); d = d.plusDays(1)) {
+                if (onlyDate != null && !d.equals(onlyDate)) continue;
+                if (d.getDayOfWeek() == DayOfWeek.SUNDAY) continue;
+                String key = lr.getUsername() + "|" + d;
+                if (!covered.add(key)) continue; // real row, or already-added synthetic for an overlapping leave
+                if (holidayRepository.existsByDate(d)) continue;
+                merged.add(Attendance.builder()
+                        .id(syntheticId--)
+                        .username(lr.getUsername())
+                        .fullName(lr.getFullName())
+                        .workDate(d)
+                        .status("ABSENT")
+                        .notes("On approved " + lr.getLeaveType() + " leave")
+                        .build());
+            }
+        }
+        merged.sort(Comparator.comparing(Attendance::getWorkDate).reversed());
+        return merged;
     }
 
     /** Mark past-day records with no check-out as ABSENT, then return them for review. */

@@ -42,7 +42,7 @@ public class PwjEntryController {
             @RequestParam(required = false)     String dateTo,
             @RequestParam(defaultValue = "0")   int    page,
             @RequestParam(defaultValue = "15")  int    size,
-            @RequestParam(defaultValue = "updatedAt") String sortBy,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc")      String sortDir,
             @RequestHeader(value = "X-User-Name", required = false) String userName) {
         return ResponseEntity.ok(ApiResponse.ok("Entries fetched",
@@ -62,7 +62,7 @@ public class PwjEntryController {
             @RequestParam(required = false)              String dateTo,
             @RequestParam(defaultValue = "0")            int    page,
             @RequestParam(defaultValue = "15")           int    size,
-            @RequestParam(defaultValue = "updatedAt")    String sortBy,
+            @RequestParam(defaultValue = "createdAt")    String sortBy,
             @RequestParam(defaultValue = "desc")         String sortDir) {
         return ResponseEntity.ok(ApiResponse.ok("My entries fetched",
                 service.getByEngineer(raisedBy, search, status, approval,

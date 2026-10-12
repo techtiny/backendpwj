@@ -25,8 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -103,8 +106,8 @@ public class PwjEntryService {
         PwjEntry.EntryStatus    statusEnum   = parseEnum(PwjEntry.EntryStatus.class,    status);
         PwjEntry.ApprovalStatus approvalEnum = parseEnum(PwjEntry.ApprovalStatus.class, approval);
         Sort.Order primary = sortDir != null && sortDir.equalsIgnoreCase("asc")
-                ? Sort.Order.asc(sortBy != null ? sortBy : "updatedAt")
-                : Sort.Order.desc(sortBy != null ? sortBy : "updatedAt");
+                ? Sort.Order.asc(sortBy != null ? sortBy : "createdAt")
+                : Sort.Order.desc(sortBy != null ? sortBy : "createdAt");
         Pageable pageable = PageRequest.of(page, size, Sort.by(primary, Sort.Order.desc("id")));
         String dependencyFilter = (dependency == null || dependency.isBlank()) ? null : dependency;
         LocalDateTime from = parseDate(dateFrom, false);
@@ -185,7 +188,8 @@ public class PwjEntryService {
         entry.setPwjType(req.getPwjType());
         // deliveredDate is also set via the dedicated deliveryUpdate() endpoint — a caller
         // here that doesn't supply it (e.g. the PR-clubbing merge) must not wipe it.
-        if (req.getDeliveredDate() != null) {
+        boolean closing = req.getDeliveredDate() != null;
+        if (closing) {
             entry.setDeliveredDate(req.getDeliveredDate());
             entry.setStatus(PwjEntry.EntryStatus.CLOSED);
         } else {
@@ -201,7 +205,9 @@ public class PwjEntryService {
             entry.getSharedWithEngineers().clear();
             entry.getSharedWithEngineers().addAll(req.getSharedWithEngineers());
         }
-        return saveAndBroadcast(entry);
+        PwjEntryResponse result = saveAndBroadcast(entry);
+        if (closing) closeClubbedSiblings(entry, req.getDeliveredDate());
+        return result;
     }
 
     // ── Raising engineer / Admin / Procurement: share a PR with other
@@ -245,7 +251,8 @@ public class PwjEntryService {
             }
         }
         if (req.getStatus()      != null) entry.setStatus(req.getStatus());
-        if (req.getDeliveredDate() != null) {
+        boolean closing = req.getDeliveredDate() != null;
+        if (closing) {
             entry.setDeliveredDate(req.getDeliveredDate());
             entry.setStatus(PwjEntry.EntryStatus.CLOSED);
         }
@@ -287,7 +294,9 @@ public class PwjEntryService {
             entry.setVendorAcknowledged(req.getVendorAcknowledged());
         }
 
-        return saveAndBroadcast(entry);
+        PwjEntryResponse result = saveAndBroadcast(entry);
+        if (closing) closeClubbedSiblings(entry, req.getDeliveredDate());
+        return result;
     }
 
     // ── Site Engineer: delivery doc update + notify procurement ──────────
@@ -296,7 +305,8 @@ public class PwjEntryService {
         PwjEntry entry = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entry not found"));
         if (req.getStatus()        != null) entry.setStatus(req.getStatus());
-        if (req.getDeliveredDate() != null) {
+        boolean closing = req.getDeliveredDate() != null;
+        if (closing) {
             entry.setDeliveredDate(req.getDeliveredDate());
             entry.setStatus(PwjEntry.EntryStatus.CLOSED);
         }
@@ -304,7 +314,51 @@ public class PwjEntryService {
             entry.setDeliveryDocUrl(req.getDeliveryDocUrl());
             // EMAIL DISABLED: CompletableFuture.runAsync(() -> sendProcurementNotification(entry, req.getUpdatedBy()));
         }
-        return saveAndBroadcast(entry);
+        PwjEntryResponse result = saveAndBroadcast(entry);
+        // Several PRs clubbed into one PWJ doc are really one combined order —
+        // closing any member closes the whole group together.
+        if (closing) closeClubbedSiblings(entry, req.getDeliveredDate());
+        return result;
+    }
+
+    /** Finds every entry clubbed together with `entry` (via clubbedEntryIds on
+     *  the primary / clubbedWithId on a secondary, both stored inside the
+     *  docData JSON — see submitGenDoc/unclubEntry in the frontend) and closes
+     *  them too, so a clubbed group always closes as one unit. */
+    private void closeClubbedSiblings(PwjEntry entry, LocalDate deliveredDate) {
+        Set<Long> siblingIds = resolveClubbedGroupIds(entry);
+        if (siblingIds.isEmpty()) return;
+        for (PwjEntry sibling : repository.findAllById(siblingIds)) {
+            if (sibling.getStatus() == PwjEntry.EntryStatus.CLOSED) continue;
+            sibling.setDeliveredDate(deliveredDate);
+            sibling.setStatus(PwjEntry.EntryStatus.CLOSED);
+            saveAndBroadcast(sibling);
+        }
+    }
+
+    private Set<Long> resolveClubbedGroupIds(PwjEntry entry) {
+        Set<Long> ids = new HashSet<>();
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            JsonNode data = mapper.readTree(entry.getDocData() == null || entry.getDocData().isBlank() ? "{}" : entry.getDocData());
+            if (data.has("clubbedEntryIds") && data.get("clubbedEntryIds").isArray()) {
+                for (JsonNode n : data.get("clubbedEntryIds")) ids.add(n.asLong());
+            }
+            if (data.has("clubbedWithId") && !data.get("clubbedWithId").isNull()) {
+                Long primaryId = data.get("clubbedWithId").asLong();
+                ids.add(primaryId);
+                repository.findById(primaryId).ifPresent(primary -> {
+                    try {
+                        JsonNode pdata = mapper.readTree(primary.getDocData() == null || primary.getDocData().isBlank() ? "{}" : primary.getDocData());
+                        if (pdata.has("clubbedEntryIds") && pdata.get("clubbedEntryIds").isArray()) {
+                            for (JsonNode n : pdata.get("clubbedEntryIds")) ids.add(n.asLong());
+                        }
+                    } catch (Exception ignored) {}
+                });
+            }
+        } catch (Exception ignored) {}
+        ids.remove(entry.getId());
+        return ids;
     }
 
     // ── Approval (OH/Admin) ───────────────────────────────────────────────
@@ -410,48 +464,81 @@ public class PwjEntryService {
         ObjectMapper mapper = new ObjectMapper();
         List<Map<String, Object>> result = new ArrayList<>();
         for (PwjEntry e : repository.findAllWithDocData(isTestData)) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("docNumber",        e.getDocNumber());
-            m.put("pwjType",          e.getPwjType());
-            m.put("vendor",           e.getVendor());
-            m.put("materialRequired", e.getMaterialRequired());
-            m.put("projectName",      e.getProjectName());
-            m.put("projectId",        e.getProjectId());
-            m.put("docStatus",        e.getDocStatus());
-            double gross = 0;
-            double gstPct = 18;
-            String completionDate = null;
-            Double finalDueDays = null, advanceAmount = null, finalPct = null, finalAmount = null;
-            try {
-                JsonNode data = mapper.readTree(e.getDocData());
-                JsonNode items = data.path("items");
-                for (JsonNode item : items) {
-                    double qty  = parseD(item.path("qty").asText("0"));
-                    double rate = parseD(item.path("rate").asText("0"));
-                    gross += qty * rate;
-                }
-                double cgst = parseD(data.path("cgstPct").asText("0"));
-                double sgst = parseD(data.path("sgstPct").asText("0"));
-                double igst = parseD(data.path("igstPct").asText("0"));
-                gstPct = (cgst + sgst > 0) ? cgst + sgst : igst;
-                completionDate = data.path("completionDate").asText(null);
-                if (completionDate != null && completionDate.isBlank()) completionDate = null;
-                if (!data.path("finalDueDays").asText("").isBlank()) finalDueDays = parseD(data.path("finalDueDays").asText());
-                if (!data.path("advanceAmount").asText("").isBlank()) advanceAmount = parseD(data.path("advanceAmount").asText());
-                if (!data.path("finalPct").asText("").isBlank()) finalPct = parseD(data.path("finalPct").asText());
-                if (!data.path("finalAmount").asText("").isBlank()) finalAmount = parseD(data.path("finalAmount").asText());
-            } catch (Exception ex) { /* keep defaults */ }
-            double gstAmt = Math.round(gross * gstPct / 100 * 100.0) / 100.0;
-            m.put("gross",        gross);
-            m.put("gstPct",       gstPct);
-            m.put("gstAmount",    gstAmt);
-            m.put("totalPayable", Math.round((gross + gstAmt) * 100.0) / 100.0);
-            m.put("completionDate", completionDate);
-            m.put("finalDueDays",   finalDueDays);
-            m.put("advanceAmount",  advanceAmount);
-            m.put("finalPct",       finalPct);
-            m.put("finalAmount",    finalAmount);
-            result.add(m);
+            JsonNode top;
+            try { top = mapper.readTree(e.getDocData()); } catch (Exception ex) { top = mapper.createObjectNode(); }
+
+            // Multi-vendor/multi-PO entries (incl. "Additional PO" under an issued PR) store
+            // their sub-docs in docs[] — each is its own document and must surface to Accounts
+            // as its own row, not be collapsed into (or hidden behind) the entry's top-level
+            // fields. docs[0] is always the original/base PO; its docNumber is the group's
+            // anchor so the UI can show every additional PO grouped under it.
+            boolean isMulti = top.path("multiVendor").asBoolean(false) && top.path("docs").isArray() && top.path("docs").size() > 0;
+            List<JsonNode> docs = new ArrayList<>();
+            if (isMulti) {
+                top.path("docs").forEach(docs::add);
+            } else {
+                docs.add(top);
+            }
+            String baseDocNumber = isMulti
+                    ? (docs.get(0).path("docNumber").asText(null) != null && !docs.get(0).path("docNumber").asText("").isBlank()
+                        ? docs.get(0).path("docNumber").asText() : e.getDocNumber())
+                    : e.getDocNumber();
+
+            for (int i = 0; i < docs.size(); i++) {
+                JsonNode data = docs.get(i);
+                Map<String, Object> m = new LinkedHashMap<>();
+                String docNumber = data.path("docNumber").asText(null);
+                if (docNumber == null || docNumber.isBlank()) docNumber = i == 0 ? e.getDocNumber() : null;
+                m.put("docNumber",        docNumber);
+                m.put("pwjType",          e.getPwjType());
+                m.put("vendor",           data.path("vendor").asText(null) != null && !data.path("vendor").asText("").isBlank() ? data.path("vendor").asText() : e.getVendor());
+                m.put("materialRequired", e.getMaterialRequired());
+                m.put("projectName",      e.getProjectName());
+                m.put("projectId",        e.getProjectId());
+                m.put("docStatus",        data.path("docStatus").asText(null) != null && !data.path("docStatus").asText("").isBlank() ? data.path("docStatus").asText() : e.getDocStatus());
+                m.put("entryId",          e.getId());
+                m.put("baseDocNumber",    baseDocNumber);
+                m.put("isAdditionalPo",   i > 0);
+
+                double gross = 0;
+                double gstPct = 18;
+                String completionDate = null;
+                Double finalDueDays = null, advanceAmount = null, finalPct = null, finalAmount = null;
+                try {
+                    JsonNode items = data.path("items");
+                    for (JsonNode item : items) {
+                        double qty  = parseD(item.path("qty").asText("0"));
+                        double rate = parseD(item.path("rate").asText("0"));
+                        gross += qty * rate;
+                    }
+                    double cgst = parseD(data.path("cgstPct").asText("0"));
+                    double sgst = parseD(data.path("sgstPct").asText("0"));
+                    double igst = parseD(data.path("igstPct").asText("0"));
+                    // Must match calcTotals() in App.jsx — the formula that actually produced
+                    // the issued PO's total/amountInWords — summing all three unconditionally.
+                    // A doc normally only has one pair set (CGST+SGST or IGST), but if all three
+                    // are non-zero (data-entry slip), Accounts' payable cap must still equal what
+                    // was actually issued to the vendor, not a different, "corrected" total.
+                    gstPct = cgst + sgst + igst;
+                    completionDate = data.path("completionDate").asText(null);
+                    if (completionDate != null && completionDate.isBlank()) completionDate = null;
+                    if (!data.path("finalDueDays").asText("").isBlank()) finalDueDays = parseD(data.path("finalDueDays").asText());
+                    if (!data.path("advanceAmount").asText("").isBlank()) advanceAmount = parseD(data.path("advanceAmount").asText());
+                    if (!data.path("finalPct").asText("").isBlank()) finalPct = parseD(data.path("finalPct").asText());
+                    if (!data.path("finalAmount").asText("").isBlank()) finalAmount = parseD(data.path("finalAmount").asText());
+                } catch (Exception ex) { /* keep defaults */ }
+                double gstAmt = Math.round(gross * gstPct / 100 * 100.0) / 100.0;
+                m.put("gross",        gross);
+                m.put("gstPct",       gstPct);
+                m.put("gstAmount",    gstAmt);
+                m.put("totalPayable", Math.round((gross + gstAmt) * 100.0) / 100.0);
+                m.put("completionDate", completionDate);
+                m.put("finalDueDays",   finalDueDays);
+                m.put("advanceAmount",  advanceAmount);
+                m.put("finalPct",       finalPct);
+                m.put("finalAmount",    finalAmount);
+                result.add(m);
+            }
         }
         return result;
     }
