@@ -70,6 +70,13 @@ public class Project {
     @Column(name = "boq_used_labels", columnDefinition = "TEXT")
     private String boqUsedLabels;
 
+    // JSON array of manually-entered items not present in the uploaded BOQ
+    // (e.g. "NT"/non-tender items) — [{ "id", "sno", "description", "qty",
+    // "unit" }]. Shown as its own table below the BOQ table and selectable
+    // into a PR the same way BOQ line items are. Opaque to the backend.
+    @Column(name = "boq_additional_items", columnDefinition = "TEXT")
+    private String boqAdditionalItems;
+
     @Column(name = "quote_total_value", precision = 15, scale = 2)
     private BigDecimal quoteTotalValue;
 

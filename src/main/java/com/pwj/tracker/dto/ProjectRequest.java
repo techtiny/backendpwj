@@ -25,6 +25,7 @@ public class ProjectRequest {
     private String boqDocUrl;
     private String boqFileName;
     private String boqUsedLabels;
+    private String boqAdditionalItems;
     private BigDecimal additionalWoValue;
     private Integer additionalWoGstPct;
     private String additionalWoDocUrl;

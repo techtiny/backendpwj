@@ -92,6 +92,7 @@ public class ProjectController {
                 .boqDocUrl(req.getBoqDocUrl())
                 .boqFileName(req.getBoqFileName())
                 .boqUsedLabels(req.getBoqUsedLabels())
+                .boqAdditionalItems(req.getBoqAdditionalItems())
                 .quoteTotalValue(computeTotal(req.getQuoteValue(), req.getQuoteGstPct()))
                 .additionalWoValue(req.getAdditionalWoValue())
                 .additionalWoGstPct(req.getAdditionalWoGstPct())
@@ -134,6 +135,7 @@ public class ProjectController {
         if (req.getBoqDocUrl()            != null) project.setBoqDocUrl(req.getBoqDocUrl());
         if (req.getBoqFileName()          != null) project.setBoqFileName(req.getBoqFileName());
         if (req.getBoqUsedLabels()        != null) project.setBoqUsedLabels(req.getBoqUsedLabels());
+        if (req.getBoqAdditionalItems()   != null) project.setBoqAdditionalItems(req.getBoqAdditionalItems());
         if (req.getAdditionalWoValue()       != null) project.setAdditionalWoValue(req.getAdditionalWoValue());
         if (req.getAdditionalWoGstPct()      != null) project.setAdditionalWoGstPct(req.getAdditionalWoGstPct());
         if (req.getAdditionalWoDocUrl()      != null) project.setAdditionalWoDocUrl(req.getAdditionalWoDocUrl());
