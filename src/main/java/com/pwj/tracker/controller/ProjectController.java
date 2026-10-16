@@ -5,7 +5,9 @@ import com.pwj.tracker.dto.ApiResponse;
 import com.pwj.tracker.dto.ProjectRequest;
 import com.pwj.tracker.model.Project;
 import com.pwj.tracker.repository.ProjectRepository;
+import com.pwj.tracker.repository.ProjectScheduleRepository;
 import com.pwj.tracker.repository.PwjEntryRepository;
+import com.pwj.tracker.repository.ScheduleActivityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,8 @@ public class ProjectController {
     private final ProjectRepository projectRepository;
     private final PwjEntryRepository pwjEntryRepository;
     private final SseBroadcaster sseBroadcaster;
+    private final ProjectScheduleRepository projectScheduleRepository;
+    private final ScheduleActivityRepository scheduleActivityRepository;
 
     @GetMapping
     public ApiResponse<List<Project>> getAll() {
@@ -108,6 +112,7 @@ public class ProjectController {
                 .poWoDocUrl(req.getPoWoDocUrl())
                 .amendedPoWoStatus(req.getAmendedPoWoStatus() != null ? req.getAmendedPoWoStatus() : "N/A")
                 .amendedPoWoDocUrl(req.getAmendedPoWoDocUrl())
+                .projectType(req.getProjectType() != null && !req.getProjectType().isBlank() ? req.getProjectType().trim() : null)
                 .active(true)
                 .build();
         return ApiResponse.ok("Project created", projectRepository.save(project));
@@ -167,6 +172,8 @@ public class ProjectController {
         if (req.getAmendedPoWoDocUrl()   != null) project.setAmendedPoWoDocUrl(req.getAmendedPoWoDocUrl());
         if (req.getActive()                  != null) project.setActive(req.getActive());
         if (req.getEligibleForAccounts()     != null) project.setEligibleForAccounts(req.getEligibleForAccounts());
+        if (req.getProjectType()             != null)
+            project.setProjectType(req.getProjectType().isBlank() ? null : req.getProjectType().trim());
 
         Project saved = projectRepository.save(project);
 
@@ -189,8 +196,12 @@ public class ProjectController {
 
     /** DELETE /api/v1/projects/{id}/permanent — Admin/VP: permanently delete a project */
     @DeleteMapping("/{id}/permanent")
+    @Transactional
     public ApiResponse<Void> permanentDelete(@PathVariable Long id) {
         if (!projectRepository.existsById(id)) throw new RuntimeException("Project not found: " + id);
+        // The Operations schedule has no FK to projects — clear it explicitly.
+        scheduleActivityRepository.deleteByProjectId(id);
+        projectScheduleRepository.deleteByProjectId(id);
         projectRepository.deleteById(id);
         return ApiResponse.ok("Project permanently deleted", null);
     }

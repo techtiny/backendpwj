@@ -124,6 +124,12 @@ public class Project {
     @Column(name = "amended_po_wo_doc_url", length = 500)
     private String amendedPoWoDocUrl;
 
+    // ── Operations ──────────────────────────────────────────────────────────
+    // Free-text category used to group projects in the Operations module
+    // (e.g. "Commercial", "Construction", "Renovation"). Null = unassigned.
+    @Column(name = "project_type", length = 40)
+    private String projectType;
+
     // ── Meta ────────────────────────────────────────────────────────────────
     @Builder.Default
     @Column(name = "active", nullable = false)

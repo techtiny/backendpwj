@@ -46,4 +46,7 @@ public class ProjectRequest {
     private Boolean active;
 
     private Boolean eligibleForAccounts;
+
+    // Operations category; send "" to clear it back to unassigned.
+    private String projectType;
 }
