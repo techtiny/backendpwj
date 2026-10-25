@@ -126,7 +126,7 @@ public class Project {
 
     // ── Operations ──────────────────────────────────────────────────────────
     // Free-text category used to group projects in the Operations module
-    // (e.g. "Commercial", "Construction", "Renovation"). Null = unassigned.
+    // (e.g. "Commercial Interior", "Residential Interior", "Construction", "Renovation"). Null = unassigned.
     @Column(name = "project_type", length = 40)
     private String projectType;
 

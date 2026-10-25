@@ -96,23 +96,50 @@ public class EmployeeService {
     }
 
     public List<PerformanceRemark> remarkHistory(Long employeeId) {
-        return remarkRepo.findByEmployeeIdOrderByRemarkDateDesc(employeeId);
+        return remarkRepo.findByEmployeeIdOrderByRemarkDateDescIdDesc(employeeId);
     }
 
-    /** One remark per employee per day — upserted, not appended, so re-editing today's entry
-     *  updates it in place instead of creating duplicates. */
+    /** Appends a remark — several per employee per day are allowed. Remarks on management
+     *  employees can only be added by the CEO. */
     @Transactional
-    public PerformanceRemark upsertRemark(Long employeeId, LocalDate date, Integer rating, String notes, String actionBy) {
-        get(employeeId); // 404s if the employee doesn't exist
+    public PerformanceRemark addRemark(Long employeeId, LocalDate date, Integer rating, String notes, String actionBy, String actorRole) {
+        Employee emp = get(employeeId); // 404s if the employee doesn't exist
         if (rating == null || rating < 1 || rating > 5) {
             throw new RuntimeException("Rating must be between 1 and 5");
         }
-        PerformanceRemark r = remarkRepo.findByEmployeeIdAndRemarkDate(employeeId, date)
-                .orElseGet(() -> PerformanceRemark.builder().employeeId(employeeId).remarkDate(date).build());
-        r.setRating(rating);
-        r.setNotes(notes);
-        r.setCreatedBy(actionBy);
+        if (!List.of("ADMIN", "VP", "OH", "CEO").contains(actorRole == null ? "" : actorRole.toUpperCase())) {
+            throw new RuntimeException("Only Admin/VP/OH/CEO can add performance remarks");
+        }
+        if (isManagement(emp) && !"CEO".equalsIgnoreCase(actorRole)) {
+            throw new RuntimeException("Only the CEO can add remarks for management");
+        }
+        return remarkRepo.save(PerformanceRemark.builder()
+                .employeeId(employeeId).remarkDate(date).rating(rating).notes(notes).createdBy(actionBy).build());
+    }
+
+    /** The employee a remark is about may appeal it once, within 24h of it being recorded;
+     *  after that it stays as recorded. */
+    @Transactional
+    public PerformanceRemark appealRemark(Long employeeId, Long remarkId, String text, String username) {
+        Employee emp = get(employeeId);
+        PerformanceRemark r = remarkRepo.findById(remarkId)
+                .filter(x -> x.getEmployeeId().equals(employeeId))
+                .orElseThrow(() -> new RuntimeException("Remark not found"));
+        if (emp.getLinkedUsername() == null || username == null || !emp.getLinkedUsername().equalsIgnoreCase(username)) {
+            throw new RuntimeException("Only the employee can appeal their own remark");
+        }
+        if (text == null || text.isBlank()) throw new RuntimeException("Enter the reason for your appeal");
+        if (r.getAppealedAt() != null) throw new RuntimeException("This remark has already been appealed");
+        if (r.getCreatedAt() == null || java.time.LocalDateTime.now().isAfter(r.getCreatedAt().plusHours(24))) {
+            throw new RuntimeException("The 24-hour appeal window has closed; the remark stands as recorded");
+        }
+        r.setAppealText(text.trim());
+        r.setAppealedAt(java.time.LocalDateTime.now());
         return remarkRepo.save(r);
+    }
+
+    private boolean isManagement(Employee e) {
+        return e.getDepartment() != null && e.getDepartment().toLowerCase().contains("management");
     }
 
     private LocalDate[] rangeBounds(String range) {

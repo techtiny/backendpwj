@@ -59,15 +59,24 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Remarks fetched", service.remarkHistory(id)));
     }
 
-    /** POST /api/v1/hr/employees/{id}/remarks — body: { date, rating (1-5), notes, actionBy }.
-     *  Upserts — one entry per employee per day. */
+    /** POST /api/v1/hr/employees/{id}/remarks — body: { date, rating (1-5), notes, actionBy, actorRole }.
+     *  Appends a new remark; multiple per employee per day are allowed. */
     @PostMapping("/{id}/remarks")
-    public ResponseEntity<ApiResponse<PerformanceRemark>> upsertRemark(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<ApiResponse<PerformanceRemark>> addRemark(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         LocalDate date = body.get("date") != null ? LocalDate.parse(body.get("date").toString()) : LocalDate.now();
         Integer rating = body.get("rating") != null ? Integer.valueOf(body.get("rating").toString()) : null;
         String notes = body.get("notes") != null ? body.get("notes").toString() : null;
         String actionBy = body.get("actionBy") != null ? body.get("actionBy").toString() : null;
-        return ResponseEntity.ok(ApiResponse.ok("Remark saved", service.upsertRemark(id, date, rating, notes, actionBy)));
+        String actorRole = body.get("actorRole") != null ? body.get("actorRole").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Remark saved", service.addRemark(id, date, rating, notes, actionBy, actorRole)));
+    }
+
+    /** POST /api/v1/hr/employees/{id}/remarks/{remarkId}/appeal — body: { text, username }. */
+    @PostMapping("/{id}/remarks/{remarkId}/appeal")
+    public ResponseEntity<ApiResponse<PerformanceRemark>> appeal(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {
+        String text = body.get("text") != null ? body.get("text").toString() : null;
+        String username = body.get("username") != null ? body.get("username").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Appeal submitted", service.appealRemark(id, remarkId, text, username)));
     }
 
     @ExceptionHandler(RuntimeException.class)

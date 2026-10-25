@@ -65,6 +65,10 @@ public class ScheduleActivity {
     @Column(name = "status", length = 20)
     private String status;
 
+    /** Free-text note on the activity. */
+    @Column(name = "remarks", length = 500)
+    private String remarks;
+
     @Column(name = "sort_order")
     private Integer sortOrder;
 }

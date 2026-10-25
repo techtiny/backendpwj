@@ -80,6 +80,7 @@ public class ProjectScheduleController {
             row.setActualStart(in.getActualStart());
             row.setActualFinish(in.getActualFinish());
             row.setStatus(normaliseStatus(in.getStatus()));
+            row.setRemarks(blankToNull(in.getRemarks()));
             row.setSortOrder(i);
             toSave.add(row);
         }
