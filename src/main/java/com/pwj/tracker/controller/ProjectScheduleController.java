@@ -72,7 +72,9 @@ public class ProjectScheduleController {
             row.setBoqDescription(blankToNull(in.getBoqDescription()));
             row.setDescription(blankToNull(in.getDescription()));
             row.setDependency(normaliseDependency(in.getDependency()));
+            row.setDependencyStartDate(in.getDependencyStartDate());
             row.setDependencyTargetDate(in.getDependencyTargetDate());
+            row.setMaterialLeadDays(in.getMaterialLeadDays());
             row.setMaterialDeliveryDate(in.getMaterialDeliveryDate());
             row.setDurationDays(in.getDurationDays());
             row.setPlannedStart(in.getPlannedStart());
@@ -123,11 +125,11 @@ public class ProjectScheduleController {
         return s == null || s.isBlank() ? null : s.trim();
     }
 
-    private static final List<String> DEPENDENCIES = List.of("Architect", "Consultant", "Client");
-
+    /** Free text: Architect / Consultant / Client from the dropdown, or whatever was typed under "Others". */
     private static String normaliseDependency(String s) {
         if (s == null || s.isBlank()) return null;
-        return DEPENDENCIES.stream().filter(d -> d.equalsIgnoreCase(s.trim())).findFirst().orElse(null);
+        String t = s.trim();
+        return t.length() > 100 ? t.substring(0, 100) : t;
     }
 
     private static String normaliseStatus(String s) {

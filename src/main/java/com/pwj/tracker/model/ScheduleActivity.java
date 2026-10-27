@@ -36,12 +36,19 @@ public class ScheduleActivity {
     @Column(name = "description", length = 500)
     private String description;
 
-    /** Who this activity waits on: "Architect" | "Consultant" | "Client" | null (none). */
-    @Column(name = "dependency", length = 20)
+    /** Who this activity waits on: "Architect" | "Consultant" | "Client", free text for "Others", or null (none). */
+    @Column(name = "dependency", length = 100)
     private String dependency;
+
+    @Column(name = "dependency_start_date")
+    private LocalDate dependencyStartDate;
 
     @Column(name = "dependency_target_date")
     private LocalDate dependencyTargetDate;
+
+    /** Days the material takes to arrive (lead time). */
+    @Column(name = "material_lead_days")
+    private Integer materialLeadDays;
 
     @Column(name = "material_delivery_date")
     private LocalDate materialDeliveryDate;
