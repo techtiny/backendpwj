@@ -55,6 +55,17 @@ public class PwjEntryResponse {
     private PwjEntry.Visibility visibility;
     private Set<String> sharedWithEngineers;
     private String docData;
+    private String allocatedTo;
+    private String allocatedToName;
+    private String allocatedBy;
+    private LocalDateTime allocatedAt;
+    private String closureRequestStatus;
+    private String closureReason;
+    private String closureRequestedBy;
+    private LocalDateTime closureRequestedAt;
+    private String closureDecidedBy;
+    private LocalDateTime closureDecidedAt;
+    private String closureDecisionComment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

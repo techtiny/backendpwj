@@ -82,6 +82,8 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
         Pageable pageable
     );
 
+    List<PwjEntry> findByClosureRequestStatusAndIsTestData(String closureRequestStatus, Boolean isTestData);
+
     long countByStatusAndIsTestData(PwjEntry.EntryStatus status, Boolean isTestData);
     long countByApprovalStatusAndIsTestData(PwjEntry.ApprovalStatus approvalStatus, Boolean isTestData);
 
@@ -102,6 +104,12 @@ public interface PwjEntryRepository extends JpaRepository<PwjEntry, Long> {
            "AND e.isTestData = false AND e.createdAt BETWEEN :from AND :to")
     long countByRaisedByAndCreatedAtBetween(@Param("raisedBy") String raisedBy,
                                              @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /** Same as above but only the PRs that are CLOSED — the Employee profile's "PRs closed" stat. */
+    @Query("SELECT COUNT(e) FROM PwjEntry e WHERE LOWER(e.raisedBy) = LOWER(:raisedBy) AND e.status = :status " +
+           "AND e.isTestData = false AND e.createdAt BETWEEN :from AND :to")
+    long countByRaisedByAndStatusAndCreatedAtBetween(@Param("raisedBy") String raisedBy, @Param("status") PwjEntry.EntryStatus status,
+                                                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     @Query("SELECT DISTINCT e.projectName FROM PwjEntry e ORDER BY e.projectName")
     List<String> findDistinctProjectNames();

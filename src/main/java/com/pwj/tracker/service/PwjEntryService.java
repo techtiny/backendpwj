@@ -677,6 +677,79 @@ public class PwjEntryService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    /** Admin / VP: allocate a PR to a procurement user (blank username clears the allocation). */
+    @Transactional
+    public PwjEntryResponse allocate(Long id, String username, String name, String allocatedBy, String role) {
+        if (!"ADMIN".equalsIgnoreCase(role) && !"VP".equalsIgnoreCase(role))
+            throw new RuntimeException("Only an Admin or the VP can allocate PRs to procurement users");
+        PwjEntry entry = repository.findById(id).orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (username == null || username.isBlank()) {
+            entry.setAllocatedTo(null); entry.setAllocatedToName(null);
+        } else {
+            entry.setAllocatedTo(username.trim());
+            entry.setAllocatedToName(name == null || name.isBlank() ? username.trim() : name.trim());
+        }
+        entry.setAllocatedBy(allocatedBy);
+        entry.setAllocatedAt(LocalDateTime.now());
+        return saveAndBroadcast(entry);
+    }
+
+    // ── Manual closure: Admin asks (reason is recorded in remarks), VP decides ──
+
+    private static final java.time.format.DateTimeFormatter STAMP = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    private void appendRemark(PwjEntry entry, String line) {
+        String cur = entry.getRemarks();
+        entry.setRemarks((cur == null || cur.isBlank()) ? line : cur + "\n" + line);
+    }
+
+    @Transactional
+    public PwjEntryResponse requestManualClosure(Long id, String reason, String requestedBy, String role) {
+        if (!"ADMIN".equalsIgnoreCase(role)) throw new RuntimeException("Only an Admin can request a manual closure");
+        if (reason == null || reason.isBlank()) throw new RuntimeException("Enter the reason for closing this PR");
+        PwjEntry entry = repository.findById(id).orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (entry.getStatus() == PwjEntry.EntryStatus.CLOSED) throw new RuntimeException("This PR is already closed");
+        if ("PENDING".equals(entry.getClosureRequestStatus())) throw new RuntimeException("A closure request is already waiting for VP approval");
+        String who = requestedBy == null || requestedBy.isBlank() ? "Admin" : requestedBy.trim();
+        entry.setClosureRequestStatus("PENDING");
+        entry.setClosureReason(reason.trim());
+        entry.setClosureRequestedBy(who);
+        entry.setClosureRequestedAt(LocalDateTime.now());
+        entry.setClosureDecidedBy(null); entry.setClosureDecidedAt(null); entry.setClosureDecisionComment(null);
+        appendRemark(entry, "[Manual closure requested by " + who + " on " + LocalDateTime.now().format(STAMP) + "] " + reason.trim());
+        return saveAndBroadcast(entry);
+    }
+
+    @Transactional
+    public PwjEntryResponse decideManualClosure(Long id, boolean approve, String decidedBy, String comment, String role) {
+        if (!"VP".equalsIgnoreCase(role)) throw new RuntimeException("Only the VP can approve or reject a manual closure");
+        PwjEntry entry = repository.findById(id).orElseThrow(() -> new RuntimeException("Entry not found"));
+        if (!"PENDING".equals(entry.getClosureRequestStatus())) throw new RuntimeException("No closure request is pending for this PR");
+        String who = decidedBy == null || decidedBy.isBlank() ? "VP" : decidedBy.trim();
+        entry.setClosureDecidedBy(who);
+        entry.setClosureDecidedAt(LocalDateTime.now());
+        entry.setClosureDecisionComment(comment == null || comment.isBlank() ? null : comment.trim());
+        String tail = (comment == null || comment.isBlank()) ? "" : " — " + comment.trim();
+        if (approve) {
+            entry.setClosureRequestStatus("APPROVED");
+            LocalDate today = LocalDate.now();
+            entry.setDeliveredDate(today);
+            entry.setStatus(PwjEntry.EntryStatus.CLOSED);
+            appendRemark(entry, "[Manual closure approved by " + who + " on " + LocalDateTime.now().format(STAMP) + "]" + tail);
+            PwjEntryResponse r = saveAndBroadcast(entry);
+            closeClubbedSiblings(entry, today);
+            return r;
+        }
+        entry.setClosureRequestStatus("REJECTED");
+        appendRemark(entry, "[Manual closure rejected by " + who + " on " + LocalDateTime.now().format(STAMP) + "]" + tail);
+        return saveAndBroadcast(entry);
+    }
+
+    public List<PwjEntryResponse> getPendingClosures(String userName) {
+        return repository.findByClosureRequestStatusAndIsTestData("PENDING", resolveIsTestAccount(userName))
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
     // ── Email helpers ─────────────────────────────────────────────────────
 
     private void sendNewEntryNotification(PwjEntryResponse entry) {
@@ -1007,6 +1080,12 @@ public class PwjEntryService {
                 .visibility(e.getVisibility())
                 .sharedWithEngineers(new java.util.LinkedHashSet<>(e.getSharedWithEngineers()))
                 .docData(e.getDocData())
+                .allocatedTo(e.getAllocatedTo()).allocatedToName(e.getAllocatedToName())
+                .allocatedBy(e.getAllocatedBy()).allocatedAt(e.getAllocatedAt())
+                .closureRequestStatus(e.getClosureRequestStatus()).closureReason(e.getClosureReason())
+                .closureRequestedBy(e.getClosureRequestedBy()).closureRequestedAt(e.getClosureRequestedAt())
+                .closureDecidedBy(e.getClosureDecidedBy()).closureDecidedAt(e.getClosureDecidedAt())
+                .closureDecisionComment(e.getClosureDecisionComment())
                 .dependency(e.getDependency())
                 .ack(Boolean.TRUE.equals(e.getAck()))
                 .vendorEmailEnabled(Boolean.TRUE.equals(e.getVendorEmailEnabled()))

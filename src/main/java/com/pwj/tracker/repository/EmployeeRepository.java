@@ -17,4 +17,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Optional<Employee> findByLinkedUsername(String username);
 
     boolean existsBySheetNo(String sheetNo);
+
+    boolean existsByPersonCode(String personCode);
 }

@@ -4,6 +4,7 @@ import com.pwj.tracker.model.AppUser;
 import com.pwj.tracker.model.Attendance;
 import com.pwj.tracker.model.Employee;
 import com.pwj.tracker.model.PerformanceRemark;
+import com.pwj.tracker.model.PwjEntry;
 import com.pwj.tracker.repository.AppUserRepository;
 import com.pwj.tracker.repository.AttendanceRepository;
 import com.pwj.tracker.repository.EmployeeRepository;
@@ -38,6 +39,51 @@ public class EmployeeService {
 
     public Employee get(Long id) {
         return employeeRepo.findById(id).orElseThrow(() -> new RuntimeException("Employee not found: " + id));
+    }
+
+    /** Onboards a new employee into the master. personCode is generated (H-YY-NNNN, where NNNN continues the
+     *  running sequence across years) when left blank; YY is the year of joining. */
+    @Transactional
+    public Employee create(Map<String, Object> in) {
+        String name = str(in.get("fullName"));
+        if (name == null) throw new RuntimeException("Full name is required");
+        LocalDate doj = date(in.get("doj"));
+        if (doj == null) throw new RuntimeException("Date of joining is required");
+        String code = str(in.get("personCode"));
+        if (code != null) {
+            if (employeeRepo.existsByPersonCode(code)) throw new RuntimeException("Person code already exists: " + code);
+        } else {
+            int max = 0;
+            for (Employee e : employeeRepo.findAll()) {
+                if (e.getPersonCode() == null) continue;
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("^H-\\d{2}-(\\d+)$").matcher(e.getPersonCode());
+                if (m.matches()) max = Math.max(max, Integer.parseInt(m.group(1)));
+            }
+            code = String.format("H-%02d-%04d", doj.getYear() % 100, max + 1);
+        }
+        String username = str(in.get("linkedUsername"));
+        if (username != null) {
+            userRepo.findByUsernameAndActiveTrue(username).orElseThrow(() -> new RuntimeException("No active app user: " + username));
+            if (employeeRepo.findByLinkedUsername(username).isPresent()) throw new RuntimeException("That login is already linked to another employee");
+        }
+        Employee e = Employee.builder()
+                .fullName(name).dob(date(in.get("dob"))).gender(str(in.get("gender")))
+                .department(str(in.get("department"))).designation(str(in.get("designation")))
+                .currentDesignation(str(in.get("designation")))
+                .doj(doj).personCode(code).linkedUsername(username)
+                .build();
+        return employeeRepo.save(e);
+    }
+
+    private static String str(Object o) {
+        if (o == null) return null;
+        String s = o.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private static LocalDate date(Object o) {
+        String s = str(o);
+        return s == null ? null : LocalDate.parse(s);
     }
 
     @Transactional
@@ -77,6 +123,7 @@ public class EmployeeService {
         if (username == null || username.isBlank()) {
             m.put("linked", false);
             m.put("prRaised", 0);
+            m.put("prClosed", 0);
             m.put("correctCheckins", 0);
             m.put("incompleteCheckins", 0);
             return m;
@@ -86,6 +133,8 @@ public class EmployeeService {
         long prRaised = pwjEntryRepo.countByRaisedByAndCreatedAtBetween(
                 e.getFullName(), start.atStartOfDay(), end.atTime(LocalTime.MAX));
         m.put("prRaised", prRaised);
+        m.put("prClosed", pwjEntryRepo.countByRaisedByAndStatusAndCreatedAtBetween(
+                e.getFullName(), PwjEntry.EntryStatus.CLOSED, start.atStartOfDay(), end.atTime(LocalTime.MAX)));
 
         List<Attendance> records = attendanceRepo.findByUsernameAndWorkDateBetween(username, start, end);
         long correct = records.stream().filter(a -> a.getCheckInTime() != null && a.getCheckOutTime() != null).count();

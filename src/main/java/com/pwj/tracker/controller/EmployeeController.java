@@ -25,6 +25,13 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Employees fetched", service.list()));
     }
 
+    /** POST /api/v1/hr/employees — onboard a new employee. Body: fullName, doj (required); dob, gender,
+     *  department, designation, personCode (auto when blank), linkedUsername (optional). */
+    @PostMapping
+    public ResponseEntity<ApiResponse<Employee>> create(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Employee added", service.create(body)));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<Employee>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok("Employee fetched", service.get(id)));

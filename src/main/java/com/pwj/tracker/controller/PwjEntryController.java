@@ -179,6 +179,37 @@ public class PwjEntryController {
         return ResponseEntity.ok(ApiResponse.ok("Document rejected", service.rejectDoc(id, comment)));
     }
 
+    /** PATCH /api/v1/pwj/entries/{id}/allocate — Admin/VP: body { username, name, allocatedBy, role } */
+    @PatchMapping("/entries/{id}/allocate")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> allocate(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.ok("PR allocated",
+                service.allocate(id, str(body.get("username")), str(body.get("name")), str(body.get("allocatedBy")), str(body.get("role")))));
+    }
+
+    /** POST /api/v1/pwj/entries/{id}/manual-close/request — Admin: body { reason, requestedBy, role } */
+    @PostMapping("/entries/{id}/manual-close/request")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> requestManualClosure(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Closure requested — waiting for VP approval",
+                service.requestManualClosure(id, str(body.get("reason")), str(body.get("requestedBy")), str(body.get("role")))));
+    }
+
+    /** POST /api/v1/pwj/entries/{id}/manual-close/decision — VP: body { approve, comment, decidedBy, role } */
+    @PostMapping("/entries/{id}/manual-close/decision")
+    public ResponseEntity<ApiResponse<PwjEntryResponse>> decideManualClosure(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        boolean approve = Boolean.parseBoolean(String.valueOf(body.get("approve")));
+        return ResponseEntity.ok(ApiResponse.ok(approve ? "PR closed" : "Closure request rejected",
+                service.decideManualClosure(id, approve, str(body.get("decidedBy")), str(body.get("comment")), str(body.get("role")))));
+    }
+
+    /** GET /api/v1/pwj/pending-closures — VP: manual-closure requests awaiting a decision */
+    @GetMapping("/pending-closures")
+    public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingClosures(
+            @RequestHeader(value = "X-User-Name", required = false) String userName) {
+        return ResponseEntity.ok(ApiResponse.ok("Pending closures", service.getPendingClosures(userName)));
+    }
+
+    private static String str(Object o) { return o == null ? null : o.toString(); }
+
     /** GET /api/v1/pwj/pending-doc-approvals — VP: list all docs awaiting approval */
     @GetMapping("/pending-doc-approvals")
     public ResponseEntity<ApiResponse<List<PwjEntryResponse>>> getPendingDocApprovals(

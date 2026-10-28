@@ -88,6 +88,42 @@ public class PwjEntry {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    // ── Allocation to a procurement user (Admin / VP) ─────────────────────
+    @Column(name = "allocated_to", length = 100)
+    private String allocatedTo;          // procurement user's username
+
+    @Column(name = "allocated_to_name", length = 150)
+    private String allocatedToName;
+
+    @Column(name = "allocated_by", length = 100)
+    private String allocatedBy;
+
+    @Column(name = "allocated_at")
+    private LocalDateTime allocatedAt;
+
+    // ── Manual closure (Admin requests with a reason, VP approves) ─────────
+    /** PENDING (awaiting VP) | REJECTED (VP declined — may be re-requested) | APPROVED (entry closed) | null. */
+    @Column(name = "closure_request_status", length = 20)
+    private String closureRequestStatus;
+
+    @Column(name = "closure_reason", columnDefinition = "TEXT")
+    private String closureReason;
+
+    @Column(name = "closure_requested_by", length = 100)
+    private String closureRequestedBy;
+
+    @Column(name = "closure_requested_at")
+    private LocalDateTime closureRequestedAt;
+
+    @Column(name = "closure_decided_by", length = 100)
+    private String closureDecidedBy;
+
+    @Column(name = "closure_decided_at")
+    private LocalDateTime closureDecidedAt;
+
+    @Column(name = "closure_decision_comment", length = 500)
+    private String closureDecisionComment;
+
     // ── PWJ Workflow ─────────────────────────────────────────────────────
     @Column(name = "pwj_type", length = 5)
     private String pwjType;   // "PO", "WO", "JO"
