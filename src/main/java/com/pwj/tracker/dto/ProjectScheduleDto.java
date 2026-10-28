@@ -21,6 +21,9 @@ public class ProjectScheduleDto {
     private String spocClient;
     private String spocContact;
     private String happizoRepresentative;
+    private String floorName;
+    private String roomCount;
+    private String revision;
     private String updatedBy;
     private LocalDateTime updatedAt;
     @Builder.Default

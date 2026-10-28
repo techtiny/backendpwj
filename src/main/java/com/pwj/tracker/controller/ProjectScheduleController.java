@@ -7,6 +7,9 @@ import com.pwj.tracker.model.ScheduleActivity;
 import com.pwj.tracker.repository.ProjectRepository;
 import com.pwj.tracker.repository.ProjectScheduleRepository;
 import com.pwj.tracker.repository.ScheduleActivityRepository;
+import com.pwj.tracker.repository.ScheduleRevisionRepository;
+import com.pwj.tracker.model.ScheduleRevision;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,8 @@ public class ProjectScheduleController {
     private final ProjectRepository projectRepository;
     private final ProjectScheduleRepository scheduleRepository;
     private final ScheduleActivityRepository activityRepository;
+    private final ScheduleRevisionRepository revisionRepository;
+    private final ObjectMapper mapper;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -51,6 +56,9 @@ public class ProjectScheduleController {
         header.setSpocClient(blankToNull(req.getSpocClient()));
         header.setSpocContact(blankToNull(req.getSpocContact()));
         header.setHappizoRepresentative(blankToNull(req.getHappizoRepresentative()));
+        header.setFloorName(blankToNull(req.getFloorName()));
+        header.setRoomCount(blankToNull(req.getRoomCount()));
+        header.setRevision(blankToNull(req.getRevision()));
         header.setUpdatedBy(blankToNull(req.getUpdatedBy()));
         scheduleRepository.save(header);
 
@@ -93,6 +101,105 @@ public class ProjectScheduleController {
         return ApiResponse.ok("Schedule saved", load(projectId));
     }
 
+    // ── Revisions: Rev 0, Rev 1, … — frozen copies of the saved schedule ──────────
+
+    /** GET …/schedule/revisions — newest first, without the snapshots. */
+    @GetMapping("/revisions")
+    @Transactional(readOnly = true)
+    public ApiResponse<List<Map<String, Object>>> revisions(@PathVariable Long projectId) {
+        requireProject(projectId);
+        List<Map<String, Object>> out = revisionRepository.findByProjectIdOrderByRevisionNoDesc(projectId).stream().map(r -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("revisionNo", r.getRevisionNo());
+            m.put("note", r.getNote());
+            m.put("createdBy", r.getCreatedBy());
+            m.put("createdAt", r.getCreatedAt());
+            return m;
+        }).collect(Collectors.toList());
+        return ApiResponse.ok("Revisions fetched", out);
+    }
+
+    /** GET …/schedule/revisions/{no} — the schedule exactly as it was when that revision was issued. */
+    @GetMapping("/revisions/{no}")
+    @Transactional(readOnly = true)
+    public ApiResponse<ProjectScheduleDto> revision(@PathVariable Long projectId, @PathVariable Integer no) throws Exception {
+        requireProject(projectId);
+        ScheduleRevision r = revisionRepository.findByProjectIdAndRevisionNo(projectId, no)
+                .orElseThrow(() -> new RuntimeException("Revision " + no + " not found"));
+        return ApiResponse.ok("Revision fetched", mapper.readValue(r.getSnapshot(), ProjectScheduleDto.class));
+    }
+
+    /** POST …/schedule/revisions — body { note, createdBy }. Freezes the currently SAVED schedule as the next
+     *  revision (Rev 0 first) and sets the schedule's Revision field to it. */
+    @PostMapping("/revisions")
+    @Transactional
+    public ApiResponse<Map<String, Object>> issueRevision(@PathVariable Long projectId, @RequestBody Map<String, Object> body) throws Exception {
+        requireProject(projectId);
+        ProjectScheduleDto current = load(projectId);
+        if (current.getActivities() == null || current.getActivities().isEmpty())
+            throw new RuntimeException("Add and save at least one activity before issuing a revision");
+        int next = revisionRepository.findByProjectIdOrderByRevisionNoDesc(projectId).stream()
+                .findFirst().map(r -> r.getRevisionNo() + 1).orElse(0);
+        String note = body.get("note") == null ? null : body.get("note").toString().trim();
+        if (next > 0 && (note == null || note.isEmpty())) throw new RuntimeException("Enter the reason for this revision");
+
+        ProjectSchedule header = scheduleRepository.findByProjectId(projectId)
+                .orElseGet(() -> ProjectSchedule.builder().projectId(projectId).build());
+        header.setRevision(String.valueOf(next));
+        scheduleRepository.save(header);
+        current.setRevision(String.valueOf(next));
+
+        revisionRepository.save(ScheduleRevision.builder()
+                .projectId(projectId).revisionNo(next)
+                .note(note == null || note.isEmpty() ? null : note)
+                .createdBy(body.get("createdBy") == null ? null : body.get("createdBy").toString())
+                .snapshot(mapper.writeValueAsString(current)).build());
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("revisionNo", next);
+        return ApiResponse.ok("Revision " + next + " issued", out);
+    }
+
+    /** POST …/schedule/revisions/{no}/restore — go back to a revision: the working schedule becomes a copy of
+     *  that revision's header and activities. Issued revisions are never touched, so nothing is lost; any
+     *  changes made since the last issued revision ARE replaced. */
+    @PostMapping("/revisions/{no}/restore")
+    @Transactional
+    public ApiResponse<ProjectScheduleDto> restoreRevision(@PathVariable Long projectId, @PathVariable Integer no,
+                                                           @RequestBody(required = false) Map<String, Object> body) throws Exception {
+        requireProject(projectId);
+        ScheduleRevision r = revisionRepository.findByProjectIdAndRevisionNo(projectId, no)
+                .orElseThrow(() -> new RuntimeException("Revision " + no + " not found"));
+        ProjectScheduleDto snap = mapper.readValue(r.getSnapshot(), ProjectScheduleDto.class);
+
+        ProjectSchedule header = scheduleRepository.findByProjectId(projectId)
+                .orElseGet(() -> ProjectSchedule.builder().projectId(projectId).build());
+        header.setWoNumber(blankToNull(snap.getWoNumber()));
+        header.setStartDate(snap.getStartDate());
+        header.setCompletionDate(snap.getCompletionDate());
+        header.setSpocClient(blankToNull(snap.getSpocClient()));
+        header.setSpocContact(blankToNull(snap.getSpocContact()));
+        header.setHappizoRepresentative(blankToNull(snap.getHappizoRepresentative()));
+        header.setFloorName(blankToNull(snap.getFloorName()));
+        header.setRoomCount(blankToNull(snap.getRoomCount()));
+        header.setRevision(String.valueOf(no));
+        header.setUpdatedBy(body != null && body.get("restoredBy") != null ? body.get("restoredBy").toString() : null);
+        scheduleRepository.save(header);
+
+        activityRepository.deleteByProjectId(projectId);
+        activityRepository.flush();
+        List<ScheduleActivity> copies = new ArrayList<>();
+        int i = 0;
+        for (ScheduleActivity a : snap.getActivities()) {
+            a.setId(null);
+            a.setProjectId(projectId);
+            a.setSortOrder(i++);
+            copies.add(a);
+        }
+        activityRepository.saveAll(copies);
+        return ApiResponse.ok("Schedule restored to Rev " + no, load(projectId));
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Void>> handleError(RuntimeException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
@@ -112,6 +219,9 @@ public class ProjectScheduleController {
             dto.setSpocClient(h.getSpocClient());
             dto.setSpocContact(h.getSpocContact());
             dto.setHappizoRepresentative(h.getHappizoRepresentative());
+            dto.setFloorName(h.getFloorName());
+            dto.setRoomCount(h.getRoomCount());
+            dto.setRevision(h.getRevision());
             dto.setUpdatedBy(h.getUpdatedBy());
             dto.setUpdatedAt(h.getUpdatedAt());
         }

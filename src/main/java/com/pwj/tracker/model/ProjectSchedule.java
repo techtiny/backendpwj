@@ -45,6 +45,16 @@ public class ProjectSchedule {
     @Column(name = "happizo_representative", length = 150)
     private String happizoRepresentative;
 
+    /** Free-text labels shown on the schedule chart header (e.g. "4", "17", "0"). */
+    @Column(name = "floor_name", length = 100)
+    private String floorName;
+
+    @Column(name = "room_count", length = 30)
+    private String roomCount;
+
+    @Column(name = "revision", length = 30)
+    private String revision;
+
     @Column(name = "updated_by", length = 100)
     private String updatedBy;
 

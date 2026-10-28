@@ -8,6 +8,7 @@ import com.pwj.tracker.repository.ProjectRepository;
 import com.pwj.tracker.repository.ProjectScheduleRepository;
 import com.pwj.tracker.repository.PwjEntryRepository;
 import com.pwj.tracker.repository.ScheduleActivityRepository;
+import com.pwj.tracker.repository.ScheduleRevisionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class ProjectController {
     private final SseBroadcaster sseBroadcaster;
     private final ProjectScheduleRepository projectScheduleRepository;
     private final ScheduleActivityRepository scheduleActivityRepository;
+    private final ScheduleRevisionRepository scheduleRevisionRepository;
 
     @GetMapping
     public ApiResponse<List<Project>> getAll() {
@@ -201,6 +203,7 @@ public class ProjectController {
         if (!projectRepository.existsById(id)) throw new RuntimeException("Project not found: " + id);
         // The Operations schedule has no FK to projects — clear it explicitly.
         scheduleActivityRepository.deleteByProjectId(id);
+        scheduleRevisionRepository.deleteByProjectId(id);
         projectScheduleRepository.deleteByProjectId(id);
         projectRepository.deleteById(id);
         return ApiResponse.ok("Project permanently deleted", null);
