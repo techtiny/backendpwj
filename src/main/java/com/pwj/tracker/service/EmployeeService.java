@@ -95,6 +95,11 @@ public class EmployeeService {
         return m;
     }
 
+    /** Every remark recorded for one day, across employees (HR dashboard). */
+    public List<PerformanceRemark> remarksOn(LocalDate date) {
+        return remarkRepo.findByRemarkDateOrderByIdDesc(date);
+    }
+
     public List<PerformanceRemark> remarkHistory(Long employeeId) {
         return remarkRepo.findByEmployeeIdOrderByRemarkDateDescIdDesc(employeeId);
     }
@@ -104,8 +109,11 @@ public class EmployeeService {
     @Transactional
     public PerformanceRemark addRemark(Long employeeId, LocalDate date, Integer rating, String notes, String actionBy, String actorRole) {
         Employee emp = get(employeeId); // 404s if the employee doesn't exist
-        if (rating == null || rating < 1 || rating > 5) {
+        if (rating != null && (rating < 1 || rating > 5)) {
             throw new RuntimeException("Rating must be between 1 and 5");
+        }
+        if (rating == null && (notes == null || notes.isBlank())) {
+            throw new RuntimeException("Add a comment or a rating");
         }
         if (!List.of("ADMIN", "VP", "OH", "CEO").contains(actorRole == null ? "" : actorRole.toUpperCase())) {
             throw new RuntimeException("Only Admin/VP/OH/CEO can add performance remarks");

@@ -50,6 +50,9 @@ public class ScheduleActivity {
     @Column(name = "material_lead_days")
     private Integer materialLeadDays;
 
+    @Column(name = "material_lead_date")
+    private LocalDate materialLeadDate;
+
     @Column(name = "material_delivery_date")
     private LocalDate materialDeliveryDate;
 

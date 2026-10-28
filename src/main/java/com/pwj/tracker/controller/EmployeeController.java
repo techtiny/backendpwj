@@ -53,6 +53,13 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Stats fetched", service.stats(id, range)));
     }
 
+    /** GET /api/v1/hr/employees/remarks/by-date?date=YYYY-MM-DD — all remarks of a day (default today), newest first. */
+    @GetMapping("/remarks/by-date")
+    public ResponseEntity<ApiResponse<List<PerformanceRemark>>> remarksByDate(@RequestParam(required = false) String date) {
+        LocalDate d = date != null && !date.isBlank() ? LocalDate.parse(date) : LocalDate.now();
+        return ResponseEntity.ok(ApiResponse.ok("Remarks fetched", service.remarksOn(d)));
+    }
+
     /** GET /api/v1/hr/employees/{id}/remarks — full daily performance history, newest first. */
     @GetMapping("/{id}/remarks")
     public ResponseEntity<ApiResponse<List<PerformanceRemark>>> remarks(@PathVariable Long id) {

@@ -75,6 +75,7 @@ public class ProjectScheduleController {
             row.setDependencyStartDate(in.getDependencyStartDate());
             row.setDependencyTargetDate(in.getDependencyTargetDate());
             row.setMaterialLeadDays(in.getMaterialLeadDays());
+            row.setMaterialLeadDate(in.getMaterialLeadDate());
             row.setMaterialDeliveryDate(in.getMaterialDeliveryDate());
             row.setDurationDays(in.getDurationDays());
             row.setPlannedStart(in.getPlannedStart());

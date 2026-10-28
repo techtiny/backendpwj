@@ -29,8 +29,8 @@ public class PerformanceRemark {
     @Column(name = "remark_date", nullable = false)
     private LocalDate remarkDate;
 
-    /** 1 (poor) to 5 (excellent). */
-    @Column(name = "rating", nullable = false)
+    /** 1 (poor) to 5 (excellent); optional — a plain comment (e.g. from the HR dashboard) has none. */
+    @Column(name = "rating")
     private Integer rating;
 
     @Column(name = "notes", length = 1000)

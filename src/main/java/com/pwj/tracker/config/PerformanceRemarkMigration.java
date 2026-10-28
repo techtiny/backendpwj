@@ -30,5 +30,11 @@ public class PerformanceRemarkMigration implements ApplicationRunner {
         } catch (Exception e) {
             log.warn("Skipped hr_performance_remark unique-index cleanup: {}", e.getMessage());
         }
+        // Rating became optional (plain comments); hbm2ddl "update" won't relax an existing NOT NULL.
+        try {
+            jdbcTemplate.execute("ALTER TABLE hr_performance_remark MODIFY COLUMN rating INT NULL");
+        } catch (Exception e) {
+            log.warn("Skipped hr_performance_remark.rating nullable change: {}", e.getMessage());
+        }
     }
 }

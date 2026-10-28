@@ -10,4 +10,6 @@ import java.util.List;
 public interface PerformanceRemarkRepository extends JpaRepository<PerformanceRemark, Long> {
 
     List<PerformanceRemark> findByEmployeeIdOrderByRemarkDateDescIdDesc(Long employeeId);
+
+    List<PerformanceRemark> findByRemarkDateOrderByIdDesc(java.time.LocalDate remarkDate);
 }
