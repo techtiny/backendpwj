@@ -32,6 +32,12 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Employee added", service.create(body)));
     }
 
+    /** POST /api/v1/hr/employees/from-login/{username} — create (and link) the Employee Master record for a login that has none. */
+    @PostMapping("/from-login/{username}")
+    public ResponseEntity<ApiResponse<Employee>> fromLogin(@PathVariable String username) {
+        return ResponseEntity.ok(ApiResponse.ok("Employee profile ready", service.createFromLogin(username)));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<Employee>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok("Employee fetched", service.get(id)));

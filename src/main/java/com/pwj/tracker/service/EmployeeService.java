@@ -75,6 +75,28 @@ public class EmployeeService {
         return employeeRepo.save(e);
     }
 
+    /** Gives a login its Employee Master record (linked to it) when it has none — so new employees get a profile,
+     *  and the HR dashboard can take remarks for them, without a second manual step. Joining date defaults to the
+     *  day the login was created. Returns the existing or new record. */
+    @Transactional
+    public Employee ensureProfileForLogin(AppUser u) {
+        return employeeRepo.findByLinkedUsername(u.getUsername()).orElseGet(() -> {
+            Map<String, Object> in = new java.util.HashMap<>();
+            in.put("fullName", u.getFullName());
+            in.put("designation", u.getDesignation());
+            in.put("doj", (u.getCreatedAt() != null ? u.getCreatedAt().toLocalDate() : LocalDate.now()).toString());
+            in.put("linkedUsername", u.getUsername());
+            return create(in);
+        });
+    }
+
+    @Transactional
+    public Employee createFromLogin(String username) {
+        AppUser u = userRepo.findByUsernameAndActiveTrue(username)
+                .orElseThrow(() -> new RuntimeException("No active app user: " + username));
+        return ensureProfileForLogin(u);
+    }
+
     private static String str(Object o) {
         if (o == null) return null;
         String s = o.toString().trim();

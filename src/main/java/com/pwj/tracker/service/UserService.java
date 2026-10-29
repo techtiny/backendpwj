@@ -24,6 +24,7 @@ public class UserService {
     private final AppUserRepository userRepository;
     private final VendorRepository vendorRepository;
     private final VendorService vendorService;
+    private final EmployeeService employeeService;
 
     // ── Login (simple password check - no JWT for simplicity) ──
     @Transactional
@@ -89,6 +90,7 @@ public class UserService {
                 .fullName(req.getFullName())
                 .email(req.getEmail())
                 .phone(req.getPhone())
+                .designation(req.getDesignation() == null || req.getDesignation().isBlank() ? null : req.getDesignation().trim())
                 .employeeNumber(req.getEmployeeNumber() == null || req.getEmployeeNumber().isBlank()
                         ? null : req.getEmployeeNumber().trim())
                 .role(req.getRole())
@@ -98,6 +100,11 @@ public class UserService {
         if (user.getEmployeeNumber() == null || user.getEmployeeNumber().isBlank()) {
             user.setEmployeeNumber(String.format("EMP%04d", user.getId()));
             user = userRepository.save(user);
+        }
+        // New login → Employee Master profile, linked from the start (never lets a profile problem block user creation).
+        if (!Boolean.TRUE.equals(user.getIsTestAccount())) {
+            try { employeeService.ensureProfileForLogin(user); }
+            catch (Exception e) { log.warn("Could not auto-create Employee Master profile for {}: {}", user.getUsername(), e.getMessage()); }
         }
         return toResponse(user);
     }
