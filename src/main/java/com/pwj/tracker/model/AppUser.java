@@ -90,6 +90,11 @@ public class AppUser {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Roles that check in/out daily and so appear in Team Attendance and are subject to the attendance-based payroll
+     *  rules — everyone except the leadership roles. One definition for all of them: a NEW role is covered automatically
+     *  (it only has to be left out here if it genuinely shouldn't check in). */
+    public static final java.util.Set<Role> CHECKIN_ROLES = java.util.EnumSet.complementOf(java.util.EnumSet.of(Role.VP, Role.OH, Role.CEO));
+
     public enum Role {
         ADMIN, ENGINEER, PROCUREMENT, VP, OH, CEO, PROJECT_MANAGER, PROCUREMENT_ENGINEER, COSTING_PLANNING_ENGINEER, BILLING_ENGINEER
     }

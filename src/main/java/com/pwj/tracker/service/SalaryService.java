@@ -40,8 +40,7 @@ public class SalaryService {
     // Roles Team Attendance requires a daily check-in from — only these are eligible for the
     // Sunday/holiday auto Extra Working Day credit below, and subject to the unauthorized-
     // absence LOP rule.
-    private static final Set<AppUser.Role> CHECKIN_ROLES = EnumSet.of(
-            AppUser.Role.ENGINEER, AppUser.Role.PROJECT_MANAGER, AppUser.Role.ADMIN, AppUser.Role.PROCUREMENT);
+    private static final Set<AppUser.Role> CHECKIN_ROLES = AppUser.CHECKIN_ROLES;
     private static final BigDecimal PF_AMOUNT = new BigDecimal("1800");
     private static final BigDecimal PT_AMOUNT = new BigDecimal("208");
     private static final BigDecimal BASIC_PCT = new BigDecimal("0.50");
