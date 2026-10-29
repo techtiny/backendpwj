@@ -23,5 +23,11 @@ public class ScheduleActivityMigration implements ApplicationRunner {
         } catch (Exception e) {
             log.warn("Skipped ops_schedule_activity.dependency widening: {}", e.getMessage());
         }
+        // A schedule entry can club several BOQ items ("2, 2a, 2b"), so boq_no needs more than 50 characters.
+        try {
+            jdbcTemplate.execute("ALTER TABLE ops_schedule_activity MODIFY COLUMN boq_no VARCHAR(255)");
+        } catch (Exception e) {
+            log.warn("Skipped ops_schedule_activity.boq_no widening: {}", e.getMessage());
+        }
     }
 }

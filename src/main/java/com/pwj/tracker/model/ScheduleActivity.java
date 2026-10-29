@@ -25,8 +25,9 @@ public class ScheduleActivity {
     @Column(name = "project_id", nullable = false)
     private Long projectId;
 
-    /** BOQ No of the linked BOQ line item; null for an activity not tied to the BOQ. */
-    @Column(name = "boq_no", length = 50)
+    /** BOQ No of the linked BOQ line item — or several, comma-separated ("2, 2a, 2b"), for an entry that clubs
+     *  multiple BOQ items; null for an activity not tied to the BOQ. */
+    @Column(name = "boq_no", length = 255)
     private String boqNo;
 
     /** Snapshot of the BOQ item's description, so the row still reads right if the BOQ is replaced. */
