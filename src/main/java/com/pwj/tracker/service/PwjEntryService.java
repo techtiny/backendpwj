@@ -140,6 +140,7 @@ public class PwjEntryService {
                 .boqNo(req.getBoqNo())
                 .materialRequired(req.getMaterialRequired())
                 .specification(req.getSpecification())
+                .boqAllocations(req.getBoqAllocations())
                 .brand(req.getBrand())
                 .unit(req.getUnit())
                 .quantity(req.getQuantity())
@@ -177,6 +178,7 @@ public class PwjEntryService {
         // a handful of fields) — a null here must never wipe what's already saved.
         if (req.getSpecification() != null) entry.setSpecification(req.getSpecification());
         if (req.getBrand() != null) entry.setBrand(req.getBrand());
+        if (req.getBoqAllocations() != null) entry.setBoqAllocations(req.getBoqAllocations());
         if (req.getUnit() != null) entry.setUnit(req.getUnit());
         if (req.getQuantity() != null) entry.setQuantity(req.getQuantity());
         if (req.getDateOfRequirement() != null) entry.setDateOfRequirement(req.getDateOfRequirement());
@@ -1080,6 +1082,7 @@ public class PwjEntryService {
                 .visibility(e.getVisibility())
                 .sharedWithEngineers(new java.util.LinkedHashSet<>(e.getSharedWithEngineers()))
                 .docData(e.getDocData())
+                .boqAllocations(e.getBoqAllocations())
                 .allocatedTo(e.getAllocatedTo()).allocatedToName(e.getAllocatedToName())
                 .allocatedBy(e.getAllocatedBy()).allocatedAt(e.getAllocatedAt())
                 .closureRequestStatus(e.getClosureRequestStatus()).closureReason(e.getClosureReason())

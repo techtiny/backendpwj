@@ -47,6 +47,7 @@ public class PwjEntryRequest {
     private LocalDate deliveredDate;
     private String remarks;
     private String docData;
+    private String boqAllocations;
     private String docNumber;
     private PwjEntry.DocStatus docStatus;
     private String dependency;

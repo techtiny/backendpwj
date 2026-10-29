@@ -88,6 +88,13 @@ public class PwjEntry {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    // ── BOQ quantity allocation ────────────────────────────────────────────
+    /** JSON: [{"label":"4a","qty":120,"unit":"Sq.ft"}, …] — how much of each BOQ item this PR requests, so the
+     *  total across PRs can be held to the BOQ quantity. Stored separately from docData, which the document
+     *  flows rewrite. */
+    @Column(name = "boq_allocations", columnDefinition = "TEXT")
+    private String boqAllocations;
+
     // ── Allocation to a procurement user (Admin / VP) ─────────────────────
     @Column(name = "allocated_to", length = 100)
     private String allocatedTo;          // procurement user's username

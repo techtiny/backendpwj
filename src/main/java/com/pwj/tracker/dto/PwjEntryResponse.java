@@ -55,6 +55,7 @@ public class PwjEntryResponse {
     private PwjEntry.Visibility visibility;
     private Set<String> sharedWithEngineers;
     private String docData;
+    private String boqAllocations;
     private String allocatedTo;
     private String allocatedToName;
     private String allocatedBy;
