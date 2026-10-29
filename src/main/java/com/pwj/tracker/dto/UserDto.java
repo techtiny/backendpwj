@@ -35,6 +35,7 @@ public class UserDto {
         public String email;
         public String phone;
         public String employeeNumber;   // optional — auto-assigned (EMP0001…) when blank
+        public String designation;      // optional — shown on the profile and copied to the Employee Master record
         @NotNull  public AppUser.Role role;
     }
 
