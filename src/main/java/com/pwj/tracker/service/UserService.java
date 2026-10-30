@@ -204,7 +204,10 @@ public class UserService {
         user.setExitReason(req.getExitReason() == null || req.getExitReason().isBlank() ? null : req.getExitReason().trim());
         user.setExitMarkedBy(req.getMarkedBy());
         user.setExitMarkedAt(java.time.LocalDateTime.now());
-        return toResponse(userRepository.save(user));
+        AppUser saved = userRepository.save(user);
+        try { employeeService.syncExit(saved.getUsername(), saved.getExitDate()); }   // also leave the Employee Master's active list
+        catch (Exception ex) { log.warn("Could not mark Employee Master exit for {}: {}", saved.getUsername(), ex.getMessage()); }
+        return toResponse(saved);
     }
 
     // ── Reinstate a wrongly-exited employee (Admin / VP) ──
@@ -212,6 +215,7 @@ public class UserService {
     public UserDto.UserResponse reinstate(Long id) {
         AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        java.time.LocalDate previousExit = user.getExitDate();
         user.setExited(false);
         user.setActive(true);
         user.setExitDate(null);
@@ -219,7 +223,10 @@ public class UserService {
         user.setExitReason(null);
         user.setExitMarkedBy(null);
         user.setExitMarkedAt(null);
-        return toResponse(userRepository.save(user));
+        AppUser saved = userRepository.save(user);
+        try { employeeService.syncReinstate(saved.getUsername(), previousExit); }
+        catch (Exception ex) { log.warn("Could not clear Employee Master exit for {}: {}", saved.getUsername(), ex.getMessage()); }
+        return toResponse(saved);
     }
 
     // ── Exited employees (with exit details) ──

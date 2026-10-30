@@ -83,7 +83,8 @@ public class AttendanceService {
 
     public List<Attendance> getUserHistory(String username) {
         List<Attendance> real = attendanceRepository.findByUsernameOrderByWorkDateDesc(username);
-        return fillLeaveGaps(real, null);
+        return fillLeaveGaps(real, null, Set.of(username));   // only this person's leave days — not everyone's
+
     }
 
     public List<Attendance> getTodayAll() {
@@ -102,7 +103,7 @@ public class AttendanceService {
                 .stream().map(AppUser::getUsername).toList();
         if (usernames.isEmpty()) return List.of();
         List<Attendance> real = attendanceRepository.findByUsernameInOrderByWorkDateDescCheckInTimeDesc(usernames);
-        return fillLeaveGaps(real, null);
+        return fillLeaveGaps(real, null, new java.util.HashSet<>(usernames));
     }
 
     /**
@@ -117,8 +118,16 @@ public class AttendanceService {
      * range for every approved leave found.
      */
     private List<Attendance> fillLeaveGaps(List<Attendance> real, LocalDate onlyDate) {
+        return fillLeaveGaps(real, onlyDate, null);
+    }
+
+    /** `onlyUsernames` (case-insensitive) limits the placeholders to those people's leave — without it a single
+     *  person's history picked up every other employee's leave days as extra "—" rows. */
+    private List<Attendance> fillLeaveGaps(List<Attendance> real, LocalDate onlyDate, Set<String> onlyUsernames) {
+        Set<String> only = onlyUsernames == null ? null
+                : onlyUsernames.stream().filter(u -> u != null).map(u -> u.trim().toLowerCase()).collect(Collectors.toSet());
         Set<String> covered = real.stream()
-                .map(a -> a.getUsername() + "|" + a.getWorkDate())
+                .map(a -> a.getUsername().trim().toLowerCase() + "|" + a.getWorkDate())
                 .collect(Collectors.toSet());
 
         List<LeaveRequest> approved = leaveRequestRepository.findByStatusOrderByCreatedAtDesc("APPROVED");
@@ -128,10 +137,11 @@ public class AttendanceService {
         long syntheticId = -1;
         for (LeaveRequest lr : approved) {
             if ("PERMISSION".equals(lr.getLeaveType()) || "HALF_DAY".equals(lr.getLeaveType())) continue;
+            if (only != null && (lr.getUsername() == null || !only.contains(lr.getUsername().trim().toLowerCase()))) continue;
             for (LocalDate d = lr.getFromDate(); !d.isAfter(lr.getToDate()); d = d.plusDays(1)) {
                 if (onlyDate != null && !d.equals(onlyDate)) continue;
                 if (d.getDayOfWeek() == DayOfWeek.SUNDAY) continue;
-                String key = lr.getUsername() + "|" + d;
+                String key = lr.getUsername().trim().toLowerCase() + "|" + d;
                 if (!covered.add(key)) continue; // real row, or already-added synthetic for an overlapping leave
                 if (holidayRepository.existsByDate(d)) continue;
                 merged.add(Attendance.builder()

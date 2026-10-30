@@ -97,6 +97,29 @@ public class EmployeeService {
         return ensureProfileForLogin(u);
     }
 
+    /** A login marked exited from Happizo also leaves the Employee Master's active list: record its date of resignation. */
+    @Transactional
+    public void syncExit(String username, LocalDate exitDate) {
+        if (username == null) return;
+        employeeRepo.findByLinkedUsername(username).ifPresent(e -> {
+            e.setDor(exitDate != null ? exitDate : LocalDate.now());
+            if (e.getDesignationAtExit() == null) e.setDesignationAtExit(e.getDesignation());
+            employeeRepo.save(e);
+        });
+    }
+
+    /** A wrongly-exited login was reinstated — clear the exit date that syncExit recorded (a different, older exit is left alone). */
+    @Transactional
+    public void syncReinstate(String username, LocalDate exitDate) {
+        if (username == null) return;
+        employeeRepo.findByLinkedUsername(username).ifPresent(e -> {
+            if (e.getDor() != null && (exitDate == null || e.getDor().equals(exitDate))) {
+                e.setDor(null);
+                employeeRepo.save(e);
+            }
+        });
+    }
+
     private static String str(Object o) {
         if (o == null) return null;
         String s = o.toString().trim();
