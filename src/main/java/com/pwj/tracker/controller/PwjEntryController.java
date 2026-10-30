@@ -179,11 +179,11 @@ public class PwjEntryController {
         return ResponseEntity.ok(ApiResponse.ok("Document rejected", service.rejectDoc(id, comment)));
     }
 
-    /** PATCH /api/v1/pwj/entries/{id}/allocate — Admin/VP: body { username, name, allocatedBy, role } */
+    /** PATCH /api/v1/pwj/entries/{id}/allocate — Admin/VP/OH: body { username, name, allocatedBy, role, comment } (comment required when taking the PR from its current assignee) */
     @PatchMapping("/entries/{id}/allocate")
     public ResponseEntity<ApiResponse<PwjEntryResponse>> allocate(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(ApiResponse.ok("PR allocated",
-                service.allocate(id, str(body.get("username")), str(body.get("name")), str(body.get("allocatedBy")), str(body.get("role")))));
+                service.allocate(id, str(body.get("username")), str(body.get("name")), str(body.get("allocatedBy")), str(body.get("role")), str(body.get("comment")))));
     }
 
     /** POST /api/v1/pwj/entries/{id}/manual-close/request — Admin: body { reason, requestedBy, role } */

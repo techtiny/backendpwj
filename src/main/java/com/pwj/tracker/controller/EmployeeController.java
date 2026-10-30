@@ -88,7 +88,9 @@ public class EmployeeController {
         String notes = body.get("notes") != null ? body.get("notes").toString() : null;
         String actionBy = body.get("actionBy") != null ? body.get("actionBy").toString() : null;
         String actorRole = body.get("actorRole") != null ? body.get("actorRole").toString() : null;
-        return ResponseEntity.ok(ApiResponse.ok("Remark saved", service.addRemark(id, date, rating, notes, actionBy, actorRole)));
+        String parameter = body.get("parameter") != null ? body.get("parameter").toString() : null;
+        String category = body.get("category") != null ? body.get("category").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Remark saved", service.addRemark(id, date, rating, notes, actionBy, actorRole, parameter, category)));
     }
 
     /** POST /api/v1/hr/employees/{id}/remarks/{remarkId}/appeal — body: { text, username }. */
@@ -99,13 +101,39 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Appeal submitted", service.appealRemark(id, remarkId, text, username)));
     }
 
-    /** PUT /api/v1/hr/employees/{id}/remarks/{remarkId}/rating — body: { rating, actionBy, role }. */
+    /** POST /api/v1/hr/employees/{id}/remarks/{remarkId}/acknowledge — body: { username }. Employee ticks (accepts) the comment. */
+    @PostMapping("/{id}/remarks/{remarkId}/acknowledge")
+    public ResponseEntity<ApiResponse<PerformanceRemark>> acknowledge(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {
+        String username = body.get("username") != null ? body.get("username").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Comment accepted", service.acknowledgeRemark(id, remarkId, username)));
+    }
+
+    /** PUT /api/v1/hr/employees/{id}/remarks/{remarkId}/rating — body: { rating, category, actionBy, role } (after the 48h window, no appeal). */
     @PutMapping("/{id}/remarks/{remarkId}/rating")
     public ResponseEntity<ApiResponse<PerformanceRemark>> rate(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {
         Integer rating = body.get("rating") != null ? Integer.valueOf(body.get("rating").toString()) : null;
         String by = body.get("actionBy") != null ? body.get("actionBy").toString() : null;
         String role = body.get("role") != null ? body.get("role").toString() : null;
-        return ResponseEntity.ok(ApiResponse.ok("Rating saved", service.rateRemark(id, remarkId, rating, by, role)));
+        String category = body.get("category") != null ? body.get("category").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Rating saved", service.rateRemark(id, remarkId, rating, category, by, role)));
+    }
+
+    /** POST /api/v1/hr/employees/{id}/remarks/{remarkId}/decision — body: { decision: ACCEPT|REJECT, comment, rating, category (REJECT), actionBy, role }. */
+    @PostMapping("/{id}/remarks/{remarkId}/decision")
+    public ResponseEntity<ApiResponse<PerformanceRemark>> decide(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {
+        String decision = body.get("decision") != null ? body.get("decision").toString() : null;
+        String comment = body.get("comment") != null ? body.get("comment").toString() : null;
+        String by = body.get("actionBy") != null ? body.get("actionBy").toString() : null;
+        String role = body.get("role") != null ? body.get("role").toString() : null;
+        Integer rating = body.get("rating") != null ? Integer.valueOf(body.get("rating").toString()) : null;
+        String category = body.get("category") != null ? body.get("category").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Appeal reviewed", service.decideAppeal(id, remarkId, decision, comment, rating, category, by, role)));
+    }
+
+    /** GET /api/v1/hr/employees/remarks/appeals/pending — appeals waiting for a reviewer's decision. */
+    @GetMapping("/remarks/appeals/pending")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> pendingAppeals() {
+        return ResponseEntity.ok(ApiResponse.ok("Pending appeals", service.pendingAppeals()));
     }
 
     @ExceptionHandler(RuntimeException.class)

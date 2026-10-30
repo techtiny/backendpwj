@@ -179,7 +179,21 @@ public class EmployeeService {
      *  employees can only be added by the CEO. */
     @Transactional
     public PerformanceRemark addRemark(Long employeeId, LocalDate date, Integer rating, String notes, String actionBy, String actorRole) {
+        return addRemark(employeeId, date, rating, notes, actionBy, actorRole, null, null);
+    }
+
+    /** Performance comment with a KPI category + parameter (scored), or a plain comment when category is null. */
+    @Transactional
+    public PerformanceRemark addRemark(Long employeeId, LocalDate date, Integer rating, String notes, String actionBy, String actorRole,
+                                       String parameter, String category) {
         Employee emp = get(employeeId); // 404s if the employee doesn't exist
+        if (category != null && !category.isBlank()) {
+            category = category.trim().toUpperCase();
+            if (!PerformanceRemark.CATEGORY_WEIGHTS.containsKey(category)) throw new RuntimeException("Unknown category: " + category);
+            if (rating == null) throw new RuntimeException("Pick a rating (1-5)");
+        } else {
+            category = null;
+        }
         if (rating != null && (rating < 1 || rating > 5)) {
             throw new RuntimeException("Rating must be between 1 and 5");
         }
@@ -193,7 +207,8 @@ public class EmployeeService {
             throw new RuntimeException("Only the CEO can add remarks for management");
         }
         return remarkRepo.save(PerformanceRemark.builder()
-                .employeeId(employeeId).remarkDate(date).rating(rating).notes(notes).createdBy(actionBy).build());
+                .employeeId(employeeId).remarkDate(date).rating(rating).notes(notes).createdBy(actionBy).createdByRole(actorRole.toUpperCase())
+                .parameter(parameter == null || parameter.isBlank() ? null : parameter.trim()).category(category).build());
     }
 
     /** The employee a remark is about may appeal it once, within 48h of it being recorded;
@@ -209,11 +224,29 @@ public class EmployeeService {
         }
         if (text == null || text.isBlank()) throw new RuntimeException("Enter the reason for your appeal");
         if (r.getAppealedAt() != null) throw new RuntimeException("This remark has already been appealed");
+        if (r.getAcknowledgedAt() != null) throw new RuntimeException("You already accepted this comment");
         if (r.getCreatedAt() == null || java.time.LocalDateTime.now().isAfter(r.getCreatedAt().plusHours(48))) {
             throw new RuntimeException("The 48-hour appeal window has closed; a reviewer will finalise the rating");
         }
         r.setAppealText(text.trim());
         r.setAppealedAt(java.time.LocalDateTime.now());
+        r.setAppealStatus("PENDING");
+        return remarkRepo.save(r);
+    }
+
+    /** Employee ticks (accepts) a comment instead of appealing it. */
+    @Transactional
+    public PerformanceRemark acknowledgeRemark(Long employeeId, Long remarkId, String username) {
+        Employee emp = get(employeeId);
+        PerformanceRemark r = remarkRepo.findById(remarkId)
+                .filter(x -> x.getEmployeeId().equals(employeeId))
+                .orElseThrow(() -> new RuntimeException("Remark not found"));
+        if (emp.getLinkedUsername() == null || username == null || !emp.getLinkedUsername().equalsIgnoreCase(username)) {
+            throw new RuntimeException("Only the employee can accept their own comment");
+        }
+        if (r.getAppealedAt() != null) throw new RuntimeException("This comment has already been appealed");
+        if (r.getAcknowledgedAt() != null) return r;
+        r.setAcknowledgedAt(java.time.LocalDateTime.now());
         return remarkRepo.save(r);
     }
 
@@ -221,20 +254,99 @@ public class EmployeeService {
      *  has passed without an appeal, or to settle an appeal. */
     @Transactional
     public PerformanceRemark rateRemark(Long employeeId, Long remarkId, Integer rating, String actionBy, String actorRole) {
+        return rateRemark(employeeId, remarkId, rating, null, actionBy, actorRole);
+    }
+
+    /** Sets the final Rating + Category (→ Score) once the appeal stage is over: the employee accepted it,
+     *  the 48h window passed with no appeal, or the appeal was rejected (✕). */
+    @Transactional
+    public PerformanceRemark rateRemark(Long employeeId, Long remarkId, Integer rating, String category, String actionBy, String actorRole) {
         Employee emp = get(employeeId);
         PerformanceRemark r = remarkRepo.findById(remarkId)
                 .filter(x -> x.getEmployeeId().equals(employeeId))
                 .orElseThrow(() -> new RuntimeException("Remark not found"));
-        if (rating == null || rating < 1 || rating > 5) throw new RuntimeException("Rating must be between 1 and 5");
-        if (!List.of("ADMIN", "VP", "OH", "CEO").contains(actorRole == null ? "" : actorRole.toUpperCase())) {
-            throw new RuntimeException("Only Admin/VP/OH/CEO can rate remarks");
+        checkReviewer(emp, actorRole);
+        if ("ACCEPTED".equals(r.getAppealStatus())) throw new RuntimeException("The appeal was accepted — this comment is withdrawn and isn't rated");
+        if ("PENDING".equals(r.getAppealStatus())) throw new RuntimeException("Review the employee's appeal first (✓ / ✕)");
+        if (r.getAppealedAt() == null && r.getAcknowledgedAt() == null && r.getCreatedAt() != null
+                && java.time.LocalDateTime.now().isBefore(r.getCreatedAt().plusHours(48))) {
+            throw new RuntimeException("Waiting for the employee to accept or appeal (48-hour window)");
         }
-        if (isManagement(emp) && !"CEO".equalsIgnoreCase(actorRole)) {
-            throw new RuntimeException("Only the CEO can rate remarks for management");
-        }
-        r.setRating(rating);
+        applyRating(r, rating, category);
         r.setRatedBy(actionBy);
         return remarkRepo.save(r);
+    }
+
+    private void applyRating(PerformanceRemark r, Integer rating, String category) {
+        if (rating == null || rating < 1 || rating > 5) throw new RuntimeException("Pick a rating (1-5 stars)");
+        String c = category == null ? "" : category.trim().toUpperCase();
+        if (!PerformanceRemark.CATEGORY_WEIGHTS.containsKey(c)) throw new RuntimeException("Select a category");
+        r.setRating(rating);
+        r.setCategory(c);
+    }
+
+    private void checkReviewer(Employee emp, String actorRole) {
+        if (!List.of("ADMIN", "VP", "OH", "CEO").contains(actorRole == null ? "" : actorRole.toUpperCase())) {
+            throw new RuntimeException("Only Admin/VP/OH/CEO can review performance comments");
+        }
+        if (isManagement(emp) && !"CEO".equalsIgnoreCase(actorRole)) {
+            throw new RuntimeException("Only the CEO can review comments for management");
+        }
+    }
+
+    /** Reviewer's verdict on an appeal: ACCEPT (tick — remark withdrawn from the score) or
+     *  REJECT (cross — remark stands; a reply explaining why is required). */
+    @Transactional
+    public PerformanceRemark decideAppeal(Long employeeId, Long remarkId, String decision, String comment, String actionBy, String actorRole) {
+        return decideAppeal(employeeId, remarkId, decision, comment, null, null, actionBy, actorRole);
+    }
+
+    /** ✓ withdraws the comment (never rated); ✕ rejects with the reviewer's remark — the comment then waits for ★ Rate. */
+    @Transactional
+    public PerformanceRemark decideAppeal(Long employeeId, Long remarkId, String decision, String comment, Integer rating, String category,
+                                          String actionBy, String actorRole) {
+        Employee emp = get(employeeId);
+        PerformanceRemark r = remarkRepo.findById(remarkId)
+                .filter(x -> x.getEmployeeId().equals(employeeId))
+                .orElseThrow(() -> new RuntimeException("Remark not found"));
+        if (!List.of("ADMIN", "VP", "OH", "CEO").contains(actorRole == null ? "" : actorRole.toUpperCase())) {
+            throw new RuntimeException("Only Admin/VP/OH/CEO can review appeals");
+        }
+        if (isManagement(emp) && !"CEO".equalsIgnoreCase(actorRole)) {
+            throw new RuntimeException("Only the CEO can review appeals from management");
+        }
+        if (r.getAppealedAt() == null) throw new RuntimeException("This remark has no appeal to review");
+        if (r.getAppealStatus() != null && !"PENDING".equals(r.getAppealStatus())) throw new RuntimeException("This appeal has already been reviewed");
+        String d = decision == null ? "" : decision.trim().toUpperCase();
+        if (!d.equals("ACCEPT") && !d.equals("REJECT")) throw new RuntimeException("Decision must be ACCEPT or REJECT");
+        if (d.equals("REJECT") && (comment == null || comment.isBlank())) throw new RuntimeException("Add a comment explaining why the appeal is not accepted");
+        if (d.equals("ACCEPT")) { r.setRating(null); r.setCategory(null); }
+        else if (rating != null && category != null) applyRating(r, rating, category); // optional — otherwise rated later via ★ Rate
+        r.setAppealStatus(d.equals("ACCEPT") ? "ACCEPTED" : "REJECTED");
+        r.setDecisionBy(actionBy);
+        r.setDecisionRole(actorRole.toUpperCase());
+        r.setDecisionAt(java.time.LocalDateTime.now());
+        r.setDecisionComment(comment == null || comment.isBlank() ? null : comment.trim());
+        return remarkRepo.save(r);
+    }
+
+    /** Appeals awaiting a reviewer's tick/cross, newest first, with the employee's name attached. */
+    public List<Map<String, Object>> pendingAppeals() {
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        List<PerformanceRemark> todo = new java.util.ArrayList<>(remarkRepo.findByAppealStatusOrderByAppealedAtDesc("PENDING"));
+        // 48h passed without an appeal and still unrated → reviewer must set Rating + Category
+        todo.addAll(remarkRepo.findAwaitingRating(java.time.LocalDateTime.now().minusHours(48), PerformanceRemark.REVIEW_FLOW_START));
+        for (PerformanceRemark r : todo) {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("remark", r);
+            m.put("type", "PENDING".equals(r.getAppealStatus()) ? "APPEAL" : "RATE");
+            employeeRepo.findById(r.getEmployeeId()).ifPresent(e -> {
+                m.put("employeeName", e.getFullName());
+                m.put("department", e.getDepartment());
+            });
+            out.add(m);
+        }
+        return out;
     }
 
     private boolean isManagement(Employee e) {

@@ -49,6 +49,7 @@ public class PwjEntryService {
     private final VendorRepository   vendorRepository;
     private final JavaMailSender     mailSender;
     private final com.pwj.tracker.config.SseBroadcaster sseBroadcaster;
+    private final EmployeeService employeeService;
 
     private static final List<String> DEPENDENCY_NAMES = List.of(
             "OH Approval", "VP Approval", "Procurement", "Site team", "Vendor", "DIP");
@@ -679,17 +680,39 @@ public class PwjEntryService {
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    /** Admin / VP: allocate a PR to a procurement user (blank username clears the allocation). */
+    /** Admin / VP / OH: allocate a PR to a procurement user (blank username clears the allocation). */
     @Transactional
     public PwjEntryResponse allocate(Long id, String username, String name, String allocatedBy, String role) {
-        if (!"ADMIN".equalsIgnoreCase(role) && !"VP".equalsIgnoreCase(role))
-            throw new RuntimeException("Only an Admin or the VP can allocate PRs to procurement users");
+        return allocate(id, username, name, allocatedBy, role, null);
+    }
+
+    /** Taking a PR away from its current assignee (re-assign or clear) needs a comment, which is recorded as a
+     *  performance comment on the previous assignee's Employee profile — same flow as a dashboard comment
+     *  (they can accept it or appeal within 48h). */
+    @Transactional
+    public PwjEntryResponse allocate(Long id, String username, String name, String allocatedBy, String role, String comment) {
+        if (!"ADMIN".equalsIgnoreCase(role) && !"VP".equalsIgnoreCase(role) && !"OH".equalsIgnoreCase(role))
+            throw new RuntimeException("Only an Admin, VP or OH can allocate PRs to procurement users");
         PwjEntry entry = repository.findById(id).orElseThrow(() -> new RuntimeException("Entry not found"));
-        if (username == null || username.isBlank()) {
+        String previous = entry.getAllocatedTo();
+        String next = username == null || username.isBlank() ? null : username.trim();
+        if (previous != null && !previous.isBlank() && !previous.equalsIgnoreCase(next == null ? "" : next)) {
+            if (comment == null || comment.isBlank())
+                throw new RuntimeException("Add a comment about " + (entry.getAllocatedToName() != null ? entry.getAllocatedToName() : previous)
+                        + " — it is recorded on their profile when a PR is taken away from them");
+            var oldUser = userRepository.findByUsernameAndActiveTrue(previous).orElse(null);
+            if (oldUser != null) {
+                var emp = employeeService.ensureProfileForLogin(oldUser);
+                String where = next == null ? "unassigned" : "reassigned to " + (name == null || name.isBlank() ? next : name.trim());
+                employeeService.addRemark(emp.getId(), java.time.LocalDate.now(), null,
+                        "PR #" + id + " " + where + " - " + comment.trim(), allocatedBy, role);
+            }
+        }
+        if (next == null) {
             entry.setAllocatedTo(null); entry.setAllocatedToName(null);
         } else {
-            entry.setAllocatedTo(username.trim());
-            entry.setAllocatedToName(name == null || name.isBlank() ? username.trim() : name.trim());
+            entry.setAllocatedTo(next);
+            entry.setAllocatedToName(name == null || name.isBlank() ? next : name.trim());
         }
         entry.setAllocatedBy(allocatedBy);
         entry.setAllocatedAt(LocalDateTime.now());

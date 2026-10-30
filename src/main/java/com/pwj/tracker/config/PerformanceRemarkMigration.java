@@ -36,5 +36,30 @@ public class PerformanceRemarkMigration implements ApplicationRunner {
         } catch (Exception e) {
             log.warn("Skipped hr_performance_remark.rating nullable change: {}", e.getMessage());
         }
+        // Appeals raised before appeal_status existed are still awaiting review.
+        try {
+            int n = jdbcTemplate.update("UPDATE hr_performance_remark SET appeal_status = 'PENDING' " +
+                    "WHERE appealed_at IS NOT NULL AND appeal_status IS NULL");
+            if (n > 0) log.info("Marked {} legacy appeal(s) as PENDING", n);
+        } catch (Exception e) {
+            log.warn("Skipped legacy appeal_status backfill: {}", e.getMessage());
+        }
+        // Decisions recorded before decision_role existed: take the role from the reviewer's login.
+        try {
+            int n = jdbcTemplate.update("UPDATE hr_performance_remark r JOIN app_user u " +
+                    "ON (u.full_name = r.decision_by OR u.username = r.decision_by) " +
+                    "SET r.decision_role = u.role WHERE r.decision_by IS NOT NULL AND r.decision_role IS NULL");
+            if (n > 0) log.info("Backfilled decision_role on {} remark(s)", n);
+        } catch (Exception e) {
+            log.warn("Skipped decision_role backfill: {}", e.getMessage());
+        }
+        try {
+            int n = jdbcTemplate.update("UPDATE hr_performance_remark r JOIN app_user u " +
+                    "ON (u.full_name = r.created_by OR u.username = r.created_by) " +
+                    "SET r.created_by_role = u.role WHERE r.created_by IS NOT NULL AND r.created_by_role IS NULL");
+            if (n > 0) log.info("Backfilled created_by_role on {} remark(s)", n);
+        } catch (Exception e) {
+            log.warn("Skipped created_by_role backfill: {}", e.getMessage());
+        }
     }
 }
