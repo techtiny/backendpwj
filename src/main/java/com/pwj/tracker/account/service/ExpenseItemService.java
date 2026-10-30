@@ -282,6 +282,11 @@ public class ExpenseItemService {
         BigDecimal gstAmt   = toBigDecimal(summary.get("gstAmount"));
         String vendor       = summary.get("vendor") != null ? String.valueOf(summary.get("vendor")) : entry.getVendor();
 
+        findPendingRequest(accountProjectId, targetDocNumber).ifPresent(p -> {
+            throw new IllegalArgumentException("A payment request for " + targetDocNumber + " (₹" + p.getSentAmount()
+                    + ") is still pending approval — wait for it to be approved or rejected before sending another");
+        });
+
         BigDecimal alreadySentPo = repo.sumSentForPo(accountProjectId, targetDocNumber);
         BigDecimal newTotalForPo = alreadySentPo.add(amount);
         if (newTotalForPo.compareTo(poValue) > 0) {
@@ -308,6 +313,8 @@ public class ExpenseItemService {
         if (remarks != null && !remarks.isBlank()) e.setRemarks(remarks.trim());
         if (paymentMadeAgainst != null && !paymentMadeAgainst.isBlank()) e.setPaymentMadeAgainst(paymentMadeAgainst.trim());
         if (paymentStage != null && !paymentStage.isBlank()) e.setPaymentStage(paymentStage.trim());
+        // Final payment is always made against the Vendor Invoice
+        if ("FINAL".equalsIgnoreCase(e.getPaymentStage())) e.setPaymentMadeAgainst("VENDOR_INVOICE");
 
         ExpenseItemDto dto = toDto(repo.save(e));
         dto.setProjectName(entry.getProjectName());
@@ -371,6 +378,10 @@ public class ExpenseItemService {
         BigDecimal poValue = toBigDecimal(summary.get("totalPayable"));
         BigDecimal alreadySent = repo.sumSentForPo(accountProjectId, targetDocNumber);
         BigDecimal available = poValue.subtract(alreadySent).max(BigDecimal.ZERO);
+        findPendingRequest(accountProjectId, targetDocNumber).ifPresent(p -> {
+            out.put("pendingRequestId", p.getId());
+            out.put("pendingAmount", p.getSentAmount());
+        });
         out.put("poValue", poValue);
         out.put("alreadySent", alreadySent);
         out.put("available", available);
@@ -582,6 +593,20 @@ public class ExpenseItemService {
         BigDecimal deduction = safe(e.getDeductionAmount());
         e.setTdsAmount(tdsAmt);
         e.setApprovedValue(base.subtract(tdsAmt).subtract(gstAmt).subtract(deduction));
+    }
+
+    /**
+     * An earlier Send for Payment request on the same doc that is still in the approval chain —
+     * not rejected at any level and not yet Level 3 VP approved.
+     */
+    private java.util.Optional<ExpenseItem> findPendingRequest(Long projectId, String refNo) {
+        return repo.findByProjectIdAndRefNo(projectId, refNo).stream()
+                .filter(e -> e.getPaymentStatus() != null && !e.getPaymentStatus().isBlank() && !"NOT_SENT".equals(e.getPaymentStatus()))
+                .filter(e -> !"REJECTED".equals(normalizeApproval(e.getOhApprovalStatus()))
+                        && !"REJECTED".equals(normalizeApproval(e.getAdminApprovalStatus()))
+                        && !"REJECTED".equals(normalizeApproval(e.getVpApprovalStatus()))
+                        && !"APPROVED".equals(normalizeApproval(e.getVpApprovalStatus())))
+                .findFirst();
     }
 
     private String normalizeApproval(String status) {

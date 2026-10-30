@@ -45,6 +45,8 @@ public interface ExpenseItemRepository extends JpaRepository<ExpenseItem, Long> 
     @Query("SELECT COALESCE(SUM(e.sentAmount), 0) FROM ExpenseItem e WHERE e.projectId = :projectId AND e.refNo = :refNo")
     BigDecimal sumSentForPo(Long projectId, String refNo);
 
+    List<ExpenseItem> findByProjectIdAndRefNo(Long projectId, String refNo);
+
     // Cross-project "Send for Payment" tracker — anything actually sent (blank/NOT_SENT excluded)
     @Query("SELECT e FROM ExpenseItem e WHERE e.paymentStatus IS NOT NULL AND e.paymentStatus <> '' AND e.paymentStatus <> 'NOT_SENT' ORDER BY e.id DESC")
     List<ExpenseItem> findSentForPayment();
