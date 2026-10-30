@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /** One day's performance note for one employee — a short rating + remark, entered by
- *  Admin/VP/OH/CEO, any number per employee per day. The employee can appeal within 24h of creation. The running history is what lets the
+ *  Admin/VP/OH/CEO, any number per employee per day. The employee can appeal within 48h of creation. The running history is what lets the
  *  employee profile show a performance trend over time, not just a single snapshot. */
 @Entity
 @Table(name = "hr_performance_remark", indexes = @Index(name = "idx_perf_remark_emp_date", columnList = "employee_id, remark_date"))
@@ -39,12 +39,16 @@ public class PerformanceRemark {
     @Column(name = "created_by", length = 150)
     private String createdBy;
 
-    /** Employee's appeal against this remark — only allowed within 24h of createdAt. */
+    /** Employee's appeal against this remark — only allowed within 48h of createdAt. */
     @Column(name = "appeal_text", length = 1000)
     private String appealText;
 
     @Column(name = "appealed_at")
     private LocalDateTime appealedAt;
+
+    /** Reviewer who set/finalised the star rating after the appeal window. */
+    @Column(name = "rated_by", length = 150)
+    private String ratedBy;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

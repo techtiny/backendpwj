@@ -99,6 +99,15 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Appeal submitted", service.appealRemark(id, remarkId, text, username)));
     }
 
+    /** PUT /api/v1/hr/employees/{id}/remarks/{remarkId}/rating — body: { rating, actionBy, role }. */
+    @PutMapping("/{id}/remarks/{remarkId}/rating")
+    public ResponseEntity<ApiResponse<PerformanceRemark>> rate(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {
+        Integer rating = body.get("rating") != null ? Integer.valueOf(body.get("rating").toString()) : null;
+        String by = body.get("actionBy") != null ? body.get("actionBy").toString() : null;
+        String role = body.get("role") != null ? body.get("role").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Rating saved", service.rateRemark(id, remarkId, rating, by, role)));
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Void>> handleError(RuntimeException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));

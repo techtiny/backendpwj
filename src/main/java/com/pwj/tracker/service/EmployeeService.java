@@ -196,8 +196,8 @@ public class EmployeeService {
                 .employeeId(employeeId).remarkDate(date).rating(rating).notes(notes).createdBy(actionBy).build());
     }
 
-    /** The employee a remark is about may appeal it once, within 24h of it being recorded;
-     *  after that it stays as recorded. */
+    /** The employee a remark is about may appeal it once, within 48h of it being recorded;
+     *  after that it is closed and a reviewer (Admin/VP/OH/CEO) sets the final star rating. */
     @Transactional
     public PerformanceRemark appealRemark(Long employeeId, Long remarkId, String text, String username) {
         Employee emp = get(employeeId);
@@ -209,11 +209,31 @@ public class EmployeeService {
         }
         if (text == null || text.isBlank()) throw new RuntimeException("Enter the reason for your appeal");
         if (r.getAppealedAt() != null) throw new RuntimeException("This remark has already been appealed");
-        if (r.getCreatedAt() == null || java.time.LocalDateTime.now().isAfter(r.getCreatedAt().plusHours(24))) {
-            throw new RuntimeException("The 24-hour appeal window has closed; the remark stands as recorded");
+        if (r.getCreatedAt() == null || java.time.LocalDateTime.now().isAfter(r.getCreatedAt().plusHours(48))) {
+            throw new RuntimeException("The 48-hour appeal window has closed; a reviewer will finalise the rating");
         }
         r.setAppealText(text.trim());
         r.setAppealedAt(java.time.LocalDateTime.now());
+        return remarkRepo.save(r);
+    }
+
+    /** Reviewer sets/updates the star rating on a remark — used once the employee's 48h window
+     *  has passed without an appeal, or to settle an appeal. */
+    @Transactional
+    public PerformanceRemark rateRemark(Long employeeId, Long remarkId, Integer rating, String actionBy, String actorRole) {
+        Employee emp = get(employeeId);
+        PerformanceRemark r = remarkRepo.findById(remarkId)
+                .filter(x -> x.getEmployeeId().equals(employeeId))
+                .orElseThrow(() -> new RuntimeException("Remark not found"));
+        if (rating == null || rating < 1 || rating > 5) throw new RuntimeException("Rating must be between 1 and 5");
+        if (!List.of("ADMIN", "VP", "OH", "CEO").contains(actorRole == null ? "" : actorRole.toUpperCase())) {
+            throw new RuntimeException("Only Admin/VP/OH/CEO can rate remarks");
+        }
+        if (isManagement(emp) && !"CEO".equalsIgnoreCase(actorRole)) {
+            throw new RuntimeException("Only the CEO can rate remarks for management");
+        }
+        r.setRating(rating);
+        r.setRatedBy(actionBy);
         return remarkRepo.save(r);
     }
 
