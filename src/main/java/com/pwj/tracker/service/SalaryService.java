@@ -58,6 +58,7 @@ public class SalaryService {
     private final HolidayRepository holidayRepo;
     private final AttendanceRepository attendanceRepo;
     private final SalaryApprovalService approvalService;
+    private final SalaryAdvanceService advanceService;
 
     // ── Salary structures ────────────────────────────────────────────────
 
@@ -258,7 +259,8 @@ public class SalaryService {
         BigDecimal aGross = money(fGross.multiply(factor));
         BigDecimal aPf = money(fPf.multiply(factor));      // PF prorates with attendance
         BigDecimal aPt = fPt;                              // PT is a flat monthly figure
-        BigDecimal aTotalDed = aPf.add(aPt);
+        BigDecimal aAdvance = money(advanceService.deductionFor(u.getUsername(), year, month)); // flat monthly instalment — not prorated
+        BigDecimal aTotalDed = aPf.add(aPt).add(aAdvance);
         BigDecimal aEmployer = aPf;
 
         String remarks = a != null && a.getRemarks() != null && !a.getRemarks().isBlank()
@@ -278,7 +280,7 @@ public class SalaryService {
                 .fixedCtc(money(fGross.add(fEmployer)))
                 .gross(aGross).basic(pct(aGross, BASIC_PCT)).hra(pct(aGross, HRA_PCT))
                 .otherAllowance(pct(aGross, OTHER_PCT)).totalGross(aGross)
-                .pf(aPf).pt(aPt).totalDed(aTotalDed).takeHome(money(aGross.subtract(aTotalDed)))
+                .pf(aPf).pt(aPt).advanceDeduction(aAdvance).totalDed(aTotalDed).takeHome(money(aGross.subtract(aTotalDed)))
                 .employer(aEmployer).ctc(money(aGross.add(aEmployer)))
                 .remarks(remarks)
                 .finalized(a != null && Boolean.TRUE.equals(a.getFinalized()))

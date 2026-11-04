@@ -67,6 +67,7 @@ public class SalaryDto {
         // Actual (prorated for the month)
         public BigDecimal gross, basic, hra, otherAllowance, totalGross;
         public BigDecimal pf, pt, totalDed, takeHome, employer, ctc;
+        public BigDecimal advanceDeduction;  // this month's advance instalment(s), already inside totalDed
 
         public String remarks;
         public boolean finalized;
