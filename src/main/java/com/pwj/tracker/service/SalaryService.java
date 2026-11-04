@@ -41,7 +41,9 @@ public class SalaryService {
     // Sunday/holiday auto Extra Working Day credit below, and subject to the unauthorized-
     // absence LOP rule.
     private static final Set<AppUser.Role> CHECKIN_ROLES = AppUser.CHECKIN_ROLES;
-    private static final BigDecimal PF_AMOUNT = new BigDecimal("1800");
+    // Default PF is 12% of Basic (Basic = 50% of gross); default PT is a flat 208. Either can be
+    // overridden per structure when defining / revising a salary.
+    private static final BigDecimal PF_PCT_OF_BASIC = new BigDecimal("0.12");
     private static final BigDecimal PT_AMOUNT = new BigDecimal("208");
     private static final BigDecimal BASIC_PCT = new BigDecimal("0.50");
     private static final BigDecimal HRA_PCT   = new BigDecimal("0.125");
@@ -78,6 +80,7 @@ public class SalaryService {
                         b.monthlyGross(g)
                          .basic(pct(g, BASIC_PCT)).hra(pct(g, HRA_PCT)).otherAllowance(pct(g, OTHER_PCT))
                          .pfApplicable(s.getPfApplicable()).ptApplicable(s.getPtApplicable())
+                         .pfAmount(pfOf(s)).ptAmount(ptOf(s))
                          .effectiveFrom(s.getEffectiveFrom()).note(s.getNote());
                     }
                     return b.build();
@@ -103,6 +106,8 @@ public class SalaryService {
                 .monthlyGross(req.getMonthlyGross().setScale(2, RoundingMode.HALF_UP))
                 .pfApplicable(req.getPfApplicable() == null || req.getPfApplicable())
                 .ptApplicable(req.getPtApplicable() == null || req.getPtApplicable())
+                .pfAmount(req.getPfAmount() != null ? money(req.getPfAmount().max(BigDecimal.ZERO)) : null)
+                .ptAmount(req.getPtAmount() != null ? money(req.getPtAmount().max(BigDecimal.ZERO)) : null)
                 .effectiveFrom(req.getEffectiveFrom() != null ? req.getEffectiveFrom() : LocalDate.now().withDayOfMonth(1))
                 .note(req.getNote())
                 .createdBy(req.getActionBy())
@@ -190,12 +195,10 @@ public class SalaryService {
         BigDecimal factor = workingDays.divide(BigDecimal.valueOf(daysInMonth), 10, RoundingMode.HALF_UP);
 
         BigDecimal fGross = s.getMonthlyGross();
-        boolean pf = Boolean.TRUE.equals(s.getPfApplicable());
-        boolean pt = Boolean.TRUE.equals(s.getPtApplicable());
-        BigDecimal fPf = pf ? PF_AMOUNT : BigDecimal.ZERO;
-        BigDecimal fPt = pt ? PT_AMOUNT : BigDecimal.ZERO;
+        BigDecimal fPf = pfOf(s);
+        BigDecimal fPt = ptOf(s);
         BigDecimal fTotalDed = fPf.add(fPt);
-        BigDecimal fEmployer = pf ? PF_AMOUNT : BigDecimal.ZERO;
+        BigDecimal fEmployer = fPf;
 
         BigDecimal aGross = money(fGross.multiply(factor));
         BigDecimal aPf = money(fPf.multiply(factor));      // PF prorates with attendance
@@ -330,6 +333,19 @@ public class SalaryService {
         String ld = strip(leaveDays).toPlainString();
         if (lop.signum() == 0) return ld + " day leave — within 1 CL";
         return ld + " day leave — 1 CL free, " + strip(lop).toPlainString() + " LOP" + suffix;
+    }
+
+    /** Monthly PF for a structure: 0 if not applicable, else the stored amount, else 12% of Basic. */
+    private BigDecimal pfOf(EmployeeSalary s) {
+        if (!Boolean.TRUE.equals(s.getPfApplicable())) return BigDecimal.ZERO;
+        if (s.getPfAmount() != null) return money(s.getPfAmount());
+        return money(pct(s.getMonthlyGross(), BASIC_PCT).multiply(PF_PCT_OF_BASIC));
+    }
+
+    /** Monthly PT for a structure: 0 if not applicable, else the stored amount, else 208. */
+    private BigDecimal ptOf(EmployeeSalary s) {
+        if (!Boolean.TRUE.equals(s.getPtApplicable())) return BigDecimal.ZERO;
+        return s.getPtAmount() != null ? money(s.getPtAmount()) : PT_AMOUNT;
     }
 
     private BigDecimal pct(BigDecimal base, BigDecimal p) { return money(base.multiply(p)); }

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * are new rows with a later effectiveFrom — the current structure for a month is the
  * row with the greatest effectiveFrom on or before that month.
  *
- * Only the monthly gross and the PF / PT flags are stored; Basic (50%), HRA (12.5%)
+ * Only the monthly gross, the PF / PT flags and optional PF / PT amounts are stored; Basic (50%), HRA (12.5%)
  * and Other Allowance (37.5%) are derived from the gross.
  */
 @Entity
@@ -44,6 +44,14 @@ public class EmployeeSalary {
 
     @Column(name = "pt_applicable", nullable = false)
     private Boolean ptApplicable = true;
+
+    /** Monthly PF / PT amounts as set at define/revise time. Null = use the default
+     *  (PF 12% of Basic, PT 208). Ignored when the matching *Applicable flag is off. */
+    @Column(name = "pf_amount", precision = 12, scale = 2)
+    private BigDecimal pfAmount;
+
+    @Column(name = "pt_amount", precision = 12, scale = 2)
+    private BigDecimal ptAmount;
 
     @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;

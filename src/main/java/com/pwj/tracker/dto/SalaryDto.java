@@ -14,6 +14,8 @@ public class SalaryDto {
         public BigDecimal monthlyGross;
         public Boolean pfApplicable;
         public Boolean ptApplicable;
+        public BigDecimal pfAmount;   // optional override; default 12% of Basic
+        public BigDecimal ptAmount;   // optional override; default 208
         public LocalDate effectiveFrom;
         public String note;
         public String actionBy;
@@ -34,6 +36,8 @@ public class SalaryDto {
         public BigDecimal otherAllowance;
         public Boolean pfApplicable;
         public Boolean ptApplicable;
+        public BigDecimal pfAmount;   // effective monthly PF
+        public BigDecimal ptAmount;   // effective monthly PT
         public LocalDate effectiveFrom;
         public String note;
     }
