@@ -391,9 +391,43 @@ public class EmployeeService {
                 && java.time.LocalDateTime.now().isBefore(r.getCreatedAt().plusHours(48))) {
             throw new RuntimeException("Waiting for the employee to accept or appeal (48-hour window)");
         }
+        boolean isEdit = r.getRating() != null;
+        String before = isEdit ? r.getRating() + "★ " + r.getCategory() : null;
+        if (isEdit) {
+            // A saved rating is locked for everyone — VP included — until the VP unlocks that entry.
+            if (!Boolean.TRUE.equals(r.getEditGranted())) {
+                throw new RuntimeException("This rating is locked — the VP must unlock the entry before it can be edited");
+            }
+            r.setEditGranted(false); r.setEditGrantedBy(null); // one edit, then locked again
+        }
         applyRating(r, rating, category);
         r.setRatedBy(actionBy);
+        if (isEdit) logEvent(r, actionBy, actorRole, "Edited rating " + before + " → " + r.getRating() + "★ " + r.getCategory());
+        else r.setRatedAt(java.time.LocalDateTime.now());
         return remarkRepo.save(r);
+    }
+
+    /** VP unlocks (or relocks) one rated entry. While unlocked, VP / Admin / OH / CEO can edit that entry — once, then it locks again. */
+    @Transactional
+    public PerformanceRemark setEditAccess(Long employeeId, Long remarkId, boolean granted, String actionBy, String actorRole) {
+        if (!"VP".equalsIgnoreCase(actorRole)) throw new RuntimeException("Only the VP can unlock an entry for editing");
+        get(employeeId);
+        PerformanceRemark r = remarkRepo.findById(remarkId)
+                .filter(x -> x.getEmployeeId().equals(employeeId))
+                .orElseThrow(() -> new RuntimeException("Remark not found"));
+        if (granted && r.getRating() == null) throw new RuntimeException("Only a rated entry can be opened for editing");
+        boolean changed = !Boolean.TRUE.equals(r.getEditGranted()) == granted;
+        r.setEditGranted(granted);
+        r.setEditGrantedBy(granted ? actionBy : null);
+        if (changed) logEvent(r, actionBy, actorRole, granted ? "Unlocked for editing" : "Locked again");
+        return remarkRepo.save(r);
+    }
+
+    /** Appends one line to the remark's audit trail. */
+    private void logEvent(PerformanceRemark r, String by, String role, String what) {
+        String line = java.time.LocalDateTime.now() + "\t" + (by == null ? "" : by.replace("\t", " ")) + "\t"
+                + (role == null ? "" : role.toUpperCase()) + "\t" + what.replace("\t", " ").replace("\n", " ");
+        r.setEditLog(r.getEditLog() == null || r.getEditLog().isBlank() ? line : r.getEditLog() + "\n" + line);
     }
 
     private void applyRating(PerformanceRemark r, Integer rating, String category) {
@@ -440,7 +474,7 @@ public class EmployeeService {
         if (!d.equals("ACCEPT") && !d.equals("REJECT")) throw new RuntimeException("Decision must be ACCEPT or REJECT");
         if (d.equals("REJECT") && (comment == null || comment.isBlank())) throw new RuntimeException("Add a comment explaining why the appeal is not accepted");
         if (d.equals("ACCEPT")) { r.setRating(null); r.setCategory(null); }
-        else if (rating != null && category != null) applyRating(r, rating, category); // optional — otherwise rated later via ★ Rate
+        else if (rating != null && category != null) { applyRating(r, rating, category); r.setRatedAt(java.time.LocalDateTime.now()); } // optional — otherwise rated later via ★ Rate
         r.setAppealStatus(d.equals("ACCEPT") ? "ACCEPTED" : "REJECTED");
         r.setDecisionBy(actionBy);
         r.setDecisionRole(actorRole.toUpperCase());

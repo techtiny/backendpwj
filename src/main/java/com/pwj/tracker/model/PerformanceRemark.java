@@ -54,6 +54,22 @@ public class PerformanceRemark {
     @Column(name = "rated_by", length = 150)
     private String ratedBy;
 
+    /** VP has unlocked this one rated entry for editing (by VP, Admin, OH or CEO). Lasts for one edit, then relocks. */
+    @Column(name = "edit_granted")
+    private Boolean editGranted;
+
+    @Column(name = "edit_granted_by", length = 150)
+    private String editGrantedBy;
+
+    /** When the rating was first saved. */
+    @Column(name = "rated_at")
+    private LocalDateTime ratedAt;
+
+    /** Audit trail of rating activity after the first save — one line per event, "ISO-time<TAB>who<TAB>ROLE<TAB>what":
+     *  unlocked / locked by the VP, and every edit (old → new). Shown under the Appeal column. */
+    @Column(name = "edit_log", columnDefinition = "TEXT")
+    private String editLog;
+
     /** What was assessed, e.g. "Site handover", "BOQ accuracy". */
     @Column(name = "parameter", length = 200)
     private String parameter;

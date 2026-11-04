@@ -163,6 +163,15 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Rating saved", service.rateRemark(id, remarkId, rating, category, by, role)));
     }
 
+    /** PUT /api/v1/hr/employees/{id}/remarks/{remarkId}/edit-access — VP only, body: { granted, actionBy, role }. */
+    @PutMapping("/{id}/remarks/{remarkId}/edit-access")
+    public ResponseEntity<ApiResponse<PerformanceRemark>> editAccess(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {
+        boolean granted = body.get("granted") != null && Boolean.parseBoolean(body.get("granted").toString());
+        String by = body.get("actionBy") != null ? body.get("actionBy").toString() : null;
+        String role = body.get("role") != null ? body.get("role").toString() : null;
+        return ResponseEntity.ok(ApiResponse.ok(granted ? "Entry unlocked for editing" : "Entry locked", service.setEditAccess(id, remarkId, granted, by, role)));
+    }
+
     /** POST /api/v1/hr/employees/{id}/remarks/{remarkId}/decision — body: { decision: ACCEPT|REJECT, comment, rating, category (REJECT), actionBy, role }. */
     @PostMapping("/{id}/remarks/{remarkId}/decision")
     public ResponseEntity<ApiResponse<PerformanceRemark>> decide(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {
