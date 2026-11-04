@@ -71,6 +71,43 @@ public class EmployeeService {
         return e;
     }
 
+    /** Edits a master record's details. Only keys present in the body change; a blank value clears an optional field
+     *  (dob, gender, department, designation) but name and date of joining can't be blanked. A changed person code
+     *  must be unique, and is mirrored onto the linked login's employee number. */
+    @Transactional
+    public Employee update(Long id, Map<String, Object> in) {
+        Employee e = get(id);
+        if (in.containsKey("fullName")) {
+            String name = str(in.get("fullName"));
+            if (name == null) throw new RuntimeException("Full name is required");
+            e.setFullName(name);
+        }
+        if (in.containsKey("doj")) {
+            LocalDate doj = date(in.get("doj"));
+            if (doj == null) throw new RuntimeException("Date of joining is required");
+            e.setDoj(doj);
+            e.setDojRaw(null);
+        }
+        if (in.containsKey("dob")) e.setDob(date(in.get("dob")));
+        if (in.containsKey("gender")) e.setGender(str(in.get("gender")));
+        if (in.containsKey("department")) e.setDepartment(str(in.get("department")));
+        if (in.containsKey("designation")) {
+            String d = str(in.get("designation"));
+            e.setDesignation(d);
+            e.setCurrentDesignation(d);
+        }
+        if (in.containsKey("personCode")) {
+            String code = str(in.get("personCode"));
+            if (code != null && !code.equals(e.getPersonCode())) {
+                if (employeeRepo.existsByPersonCode(code)) throw new RuntimeException("Person code already exists: " + code);
+                e.setPersonCode(code);
+            }
+        }
+        e = employeeRepo.save(e);
+        syncEmployeeNumber(e);
+        return e;
+    }
+
     /** Next free person code, H-YY-NNNN: YY is the joining year, NNNN continues the running sequence across years. */
     private String nextPersonCode(LocalDate doj) {
         int max = 0;

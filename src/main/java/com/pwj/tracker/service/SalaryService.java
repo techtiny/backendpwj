@@ -34,6 +34,8 @@ public class SalaryService {
     // count varies by cycle (28-31 days depending on the months it spans) and is computed
     // per-cycle in cycleBounds(). One casual leave is free.
     private static final int FREE_CL_PER_MONTH = 1;
+    /** Marks a leave request HR recorded on an employee's behalf — Attendance shows those days as "Adjusted". */
+    public static final String REGULARIZED_COMMENT = "Regularized by HR: leave taken but not applied in the portal";
     // Each unauthorized no-show/incomplete-checkout day costs 1.5 LOP days, not 1 — a stricter
     // penalty than leave that was actually applied for.
     private static final BigDecimal UNAUTHORIZED_LOP_MULTIPLIER = new BigDecimal("1.5");
@@ -177,6 +179,46 @@ public class SalaryService {
         return compute(user, s, year, month, monthStart, monthEnd, a);
     }
 
+    /** The day was flagged as an unauthorized absence only because the employee never applied for leave in the
+     *  portal. HR (Admin / VP) records it as an approved leave on their behalf — it then counts as ordinary leave
+     *  (the free CL, then LOP at 1x) instead of an unauthorized absence at 1.5x with no free CL. */
+    @Transactional
+    public SalaryDto.SheetRow regularizeAbsence(Long userId, int year, int month, SalaryDto.RegularizeRequest req) {
+        if (approvalService.isReleased(year, month)) throw new RuntimeException("This month's salary is released and locked");
+        AppUser actor = userRepo.findByUsernameAndActiveTrue(req.getUsername() == null ? "" : req.getUsername())
+                .orElseThrow(() -> new RuntimeException("Not signed in"));
+        if (actor.getRole() != AppUser.Role.ADMIN && actor.getRole() != AppUser.Role.VP)
+            throw new RuntimeException("Only Admin or VP can record leave on an employee's behalf");
+        AppUser user = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        if (req.getDate() == null) throw new RuntimeException("Pick the date");
+        String type = req.getLeaveType() == null || req.getLeaveType().isBlank() ? "CASUAL" : req.getLeaveType().trim().toUpperCase();
+        if (!List.of("CASUAL", "SICK", "EARNED", "OTHER").contains(type)) throw new RuntimeException("Leave type must be Casual, Sick, Earned or Other");
+
+        LocalDate[] bounds = cycleBounds(year, month);
+        Set<LocalDate> holidays = holidayRepo.findByDateBetweenOrderByDateAsc(bounds[0], bounds[1])
+                .stream().map(Holiday::getDate).collect(Collectors.toSet());
+        if (!unauthorizedAbsenceDates(user, bounds[0], bounds[1], holidays).contains(req.getDate()))
+            throw new RuntimeException("That day isn't an unauthorized absence in this month's cycle");
+
+        leaveRepo.save(LeaveRequest.builder()
+                .username(user.getUsername()).fullName(user.getFullName())
+                .leaveType(type).fromDate(req.getDate()).toDate(req.getDate())
+                .totalDays(BigDecimal.ONE)
+                .reason((req.getReason() == null || req.getReason().isBlank() ? "Leave not applied in the portal" : req.getReason().trim())
+                        + " — recorded by " + actor.getFullName())
+                .status("APPROVED").approvedBy(actor.getFullName())
+                .approvalComment(REGULARIZED_COMMENT)
+                .approvedAt(java.time.LocalDateTime.now())
+                .build());
+        approvalService.resetIfInProgress(year, month);
+
+        EmployeeSalary s = salaryRepo
+                .findFirstByUserIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(userId, bounds[1])
+                .orElseThrow(() -> new RuntimeException("Define a salary structure for this employee first"));
+        SalaryMonthAdjustment a = adjustmentRepo.findByUserIdAndYearAndMonth(userId, year, month).orElse(null);
+        return compute(user, s, year, month, bounds[0], bounds[1], a);
+    }
+
     // ── Core computation ─────────────────────────────────────────────────
 
     private SalaryDto.SheetRow compute(AppUser u, EmployeeSalary s, int year, int month,
@@ -186,7 +228,8 @@ public class SalaryService {
         Set<LocalDate> holidays = holidayRepo.findByDateBetweenOrderByDateAsc(monthStart, monthEnd)
                 .stream().map(Holiday::getDate).collect(Collectors.toSet());
         BigDecimal leaveDays = approvedLeaveDaysInMonth(u.getUsername(), monthStart, monthEnd, holidays);
-        BigDecimal unauthorizedDays = unauthorizedAbsenceDays(u, monthStart, monthEnd, holidays);
+        List<LocalDate> unauthorizedDates = unauthorizedAbsenceDates(u, monthStart, monthEnd, holidays);
+        BigDecimal unauthorizedDays = BigDecimal.valueOf(unauthorizedDates.size());
         // Unauthorized no-shows skip the free-CL grace entirely, and cost 1.5 LOP days each —
         // stricter than leave that was actually applied for.
         BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO)
@@ -226,7 +269,7 @@ public class SalaryService {
                 .designation(u.getDesignation() != null ? u.getDesignation() : String.valueOf(u.getRole()))
                 .cycleStart(monthStart).cycleEnd(monthEnd)
                 .daysInMonth(daysInMonth).leaveDays(strip(leaveDays)).freeCasualLeave(FREE_CL_PER_MONTH)
-                .unauthorizedDays(strip(unauthorizedDays))
+                .unauthorizedDays(strip(unauthorizedDays)).unauthorizedDates(unauthorizedDates)
                 .lopDays(strip(lop)).extraWorkingDays(strip(extra)).workingDays(strip(workingDays))
                 .fixedGross(money(fGross)).fixedBasic(pct(fGross, BASIC_PCT)).fixedHra(pct(fGross, HRA_PCT))
                 .fixedOther(pct(fGross, OTHER_PCT)).fixedTotalGross(money(fGross))
@@ -275,27 +318,27 @@ public class SalaryService {
      *  still in progress). Team Attendance roles only. Each such day costs 1.5 LOP days
      *  (UNAUTHORIZED_LOP_MULTIPLIER) — the raw day count returned here is what's shown on the
      *  sheet, the multiplier is applied where it feeds into computedLop. */
-    private BigDecimal unauthorizedAbsenceDays(AppUser u, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
-        if (!CHECKIN_ROLES.contains(u.getRole())) return BigDecimal.ZERO;
+    private List<LocalDate> unauthorizedAbsenceDates(AppUser u, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
+        if (!CHECKIN_ROLES.contains(u.getRole())) return List.of();
 
         LocalDate cutoff = LocalDate.now().minusDays(1); // never judge today or the future
         LocalDate effectiveEnd = monthEnd.isAfter(cutoff) ? cutoff : monthEnd;
-        if (effectiveEnd.isBefore(monthStart)) return BigDecimal.ZERO;
+        if (effectiveEnd.isBefore(monthStart)) return List.of();
 
         Set<LocalDate> leaveCovered = leaveCoveredDates(u.getUsername(), monthStart, effectiveEnd);
         Set<LocalDate> completeAttendance = attendanceRepo.findByUsernameAndWorkDateBetween(u.getUsername(), monthStart, effectiveEnd)
                 .stream().filter(att -> att.getCheckOutTime() != null)
                 .map(Attendance::getWorkDate).collect(Collectors.toSet());
 
-        int count = 0;
+        List<LocalDate> days = new ArrayList<>();
         for (LocalDate d = monthStart; !d.isAfter(effectiveEnd); d = d.plusDays(1)) {
             if (d.getDayOfWeek() == DayOfWeek.SUNDAY) continue;
             if (holidays.contains(d)) continue;
             if (leaveCovered.contains(d)) continue;
             if (completeAttendance.contains(d)) continue;
-            count++;
+            days.add(d);
         }
-        return BigDecimal.valueOf(count);
+        return days;
     }
 
     /** Sunday or a declared holiday, with a completed check-in + check-out that day — an

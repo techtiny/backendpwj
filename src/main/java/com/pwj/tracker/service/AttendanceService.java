@@ -2,6 +2,7 @@ package com.pwj.tracker.service;
 
 import com.pwj.tracker.model.AppUser;
 import com.pwj.tracker.model.Attendance;
+import com.pwj.tracker.model.Holiday;
 import com.pwj.tracker.model.LeaveRequest;
 import com.pwj.tracker.repository.AppUserRepository;
 import com.pwj.tracker.repository.AttendanceRepository;
@@ -131,7 +132,6 @@ public class AttendanceService {
                 .collect(Collectors.toSet());
 
         List<LeaveRequest> approved = leaveRequestRepository.findByStatusOrderByCreatedAtDesc("APPROVED");
-        if (approved.isEmpty()) return real;
 
         List<Attendance> merged = new ArrayList<>(real);
         long syntheticId = -1;
@@ -144,18 +144,74 @@ public class AttendanceService {
                 String key = lr.getUsername().trim().toLowerCase() + "|" + d;
                 if (!covered.add(key)) continue; // real row, or already-added synthetic for an overlapping leave
                 if (holidayRepository.existsByDate(d)) continue;
+                boolean adjusted = SalaryService.REGULARIZED_COMMENT.equals(lr.getApprovalComment());
                 merged.add(Attendance.builder()
                         .id(syntheticId--)
                         .username(lr.getUsername())
                         .fullName(lr.getFullName())
                         .workDate(d)
-                        .status("ABSENT")
-                        .notes("On approved " + lr.getLeaveType() + " leave")
+                        .status(adjusted ? "ADJUSTED" : "ABSENT")
+                        .notes(adjusted
+                                ? "Adjusted — " + lr.getLeaveType().toLowerCase() + " leave recorded by " + lr.getApprovedBy()
+                                : "On approved " + lr.getLeaveType() + " leave")
                         .build());
             }
         }
+        syntheticId = addMissingDayRows(real, merged, covered, approved, only, onlyDate, syntheticId);
         merged.sort(Comparator.comparing(Attendance::getWorkDate).reversed());
         return merged;
+    }
+
+    /**
+     * A working day with no check-in, no check-out and no approved leave used to leave no row at all, so the
+     * absence was invisible in All Records (while Salary counted it as an unauthorized absence). This adds a
+     * synthetic (never persisted) ABSENT row for each such day — Team Attendance roles only, Mon-Sat, not a
+     * declared holiday, from the employee's first recorded attendance up to yesterday. Skipped for the
+     * single-day "today" view: today is still in progress.
+     */
+    private long addMissingDayRows(List<Attendance> real, List<Attendance> merged, Set<String> covered,
+                                   List<LeaveRequest> approved, Set<String> only, LocalDate onlyDate, long syntheticId) {
+        if (onlyDate != null || real.isEmpty()) return syntheticId;
+
+        Map<String, LocalDate> firstSeen = new HashMap<>();
+        for (Attendance a : real) {
+            String u = a.getUsername().trim().toLowerCase();
+            firstSeen.merge(u, a.getWorkDate(), (x, y) -> x.isBefore(y) ? x : y);
+        }
+        LocalDate yesterday = LocalDate.now(IST).minusDays(1);
+        LocalDate earliest = firstSeen.values().stream().min(Comparator.naturalOrder()).orElse(yesterday);
+        if (earliest.isAfter(yesterday)) return syntheticId;
+        Set<LocalDate> holidays = holidayRepository.findByDateBetweenOrderByDateAsc(earliest, yesterday)
+                .stream().map(Holiday::getDate).collect(Collectors.toSet());
+
+        // Dates covered by any approved leave (half-day included, permission excluded) — same rule Salary uses.
+        Map<String, Set<LocalDate>> leaveDates = new HashMap<>();
+        for (LeaveRequest lr : approved) {
+            if ("PERMISSION".equals(lr.getLeaveType()) || lr.getUsername() == null) continue;
+            Set<LocalDate> set = leaveDates.computeIfAbsent(lr.getUsername().trim().toLowerCase(), k -> new HashSet<>());
+            for (LocalDate d = lr.getFromDate(); !d.isAfter(lr.getToDate()); d = d.plusDays(1)) set.add(d);
+        }
+
+        for (AppUser u : userRepository.findByRoleInAndActiveTrue(List.copyOf(AppUser.CHECKIN_ROLES))) {
+            String key = u.getUsername().trim().toLowerCase();
+            if (only != null && !only.contains(key)) continue;
+            LocalDate from = firstSeen.get(key);
+            if (from == null) continue;
+            Set<LocalDate> onLeave = leaveDates.getOrDefault(key, Set.of());
+            for (LocalDate d = from; !d.isAfter(yesterday); d = d.plusDays(1)) {
+                if (d.getDayOfWeek() == DayOfWeek.SUNDAY || holidays.contains(d) || onLeave.contains(d)) continue;
+                if (!covered.add(key + "|" + d)) continue; // a real row exists for that day
+                merged.add(Attendance.builder()
+                        .id(syntheticId--)
+                        .username(u.getUsername())
+                        .fullName(u.getFullName())
+                        .workDate(d)
+                        .status("ABSENT")
+                        .notes("No check-in · no leave applied")
+                        .build());
+            }
+        }
+        return syntheticId;
     }
 
     /** Mark past-day records with no check-out as ABSENT, then return them for review. */

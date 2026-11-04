@@ -56,6 +56,12 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Photo updated", service.updatePhoto(id, photoUrl)));
     }
 
+    /** PATCH /api/v1/hr/employees/{id} — edit details: fullName, doj, dob, gender, department, designation, personCode. */
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<Employee>> update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Employee updated", service.update(id, body)));
+    }
+
     /** PATCH /api/v1/hr/employees/{id}/link — body: { username } (or null/blank to unlink).
      *  Manual override for when the master sheet's name didn't auto-match an app login. */
     @PatchMapping("/{id}/link")

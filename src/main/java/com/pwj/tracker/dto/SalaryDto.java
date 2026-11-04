@@ -56,6 +56,7 @@ public class SalaryDto {
         public BigDecimal leaveDays;            // approved leave days in the cycle
         public int freeCasualLeave;             // 1
         public BigDecimal unauthorizedDays;     // Mon-Sat, no check-in, no leave, not a holiday — 1.5x straight to LOP, no free CL
+        public java.util.List<java.time.LocalDate> unauthorizedDates; // those days — HR can regularize each as leave
         public BigDecimal lopDays;              // loss-of-pay days actually applied
         public BigDecimal extraWorkingDays;
         public BigDecimal workingDays;
@@ -69,6 +70,15 @@ public class SalaryDto {
 
         public String remarks;
         public boolean finalized;
+    }
+
+    /** HR marks an unauthorized (never-applied) day as approved leave on the employee's behalf. */
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class RegularizeRequest {
+        public java.time.LocalDate date;
+        public String leaveType;   // CASUAL (default) | SICK | EARNED | OTHER
+        public String reason;
+        public String username;    // the Admin / VP doing it
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor

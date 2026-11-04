@@ -48,6 +48,14 @@ public class SalaryController {
                 salaryService.sheet(year != null ? year : now.getYear(), month != null ? month : now.getMonthValue())));
     }
 
+    /** POST /api/v1/hr/salary/sheet/{userId}/regularize?year=&month= — record an unapplied, unauthorized day as approved leave. */
+    @PostMapping("/sheet/{userId}/regularize")
+    public ResponseEntity<ApiResponse<SalaryDto.SheetRow>> regularize(
+            @PathVariable Long userId, @RequestParam int year, @RequestParam int month,
+            @RequestBody SalaryDto.RegularizeRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Leave recorded", salaryService.regularizeAbsence(userId, year, month, req)));
+    }
+
     /** GET /api/v1/hr/salary/approval?year=&month= — release-approval state of one month's sheet. */
     @GetMapping("/approval")
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> approval(@RequestParam int year, @RequestParam int month) {
