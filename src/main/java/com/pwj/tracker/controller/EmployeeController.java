@@ -3,7 +3,10 @@ package com.pwj.tracker.controller;
 import com.pwj.tracker.dto.ApiResponse;
 import com.pwj.tracker.model.Employee;
 import com.pwj.tracker.model.PerformanceRemark;
+import com.pwj.tracker.dto.UserDto;
+import com.pwj.tracker.repository.AppUserRepository;
 import com.pwj.tracker.service.EmployeeService;
+import com.pwj.tracker.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +21,8 @@ import java.util.Map;
 public class EmployeeController {
 
     private final EmployeeService service;
+    private final UserService userService;
+    private final AppUserRepository userRepo;
 
     /** GET /api/v1/hr/employees — full master roster, active + historical, name-sorted. */
     @GetMapping
@@ -57,6 +62,40 @@ public class EmployeeController {
     public ResponseEntity<ApiResponse<Employee>> link(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String username = body.get("username") != null ? body.get("username").toString() : null;
         return ResponseEntity.ok(ApiResponse.ok("Link updated", service.link(id, username)));
+    }
+
+    /** POST /api/v1/hr/employees/{id}/exit — move an employee to Exited. Body: exitDate, exitType, exitReason, markedBy.
+     *  A linked login is also exited (login blocked, session ended); an employee with no login just gets the exit date. */
+    @PostMapping("/{id}/exit")
+    public ResponseEntity<ApiResponse<Employee>> exit(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Employee e = service.get(id);
+        LocalDate date = body.get("exitDate") != null && !body.get("exitDate").toString().isBlank()
+                ? LocalDate.parse(body.get("exitDate").toString()) : LocalDate.now();
+        var login = e.getLinkedUsername() == null ? java.util.Optional.<com.pwj.tracker.model.AppUser>empty()
+                : userRepo.findByUsername(e.getLinkedUsername());
+        if (login.isPresent() && !Boolean.TRUE.equals(login.get().getExited())) {
+            UserDto.MarkExitRequest req = new UserDto.MarkExitRequest();
+            req.exitDate = date;
+            req.exitType = body.get("exitType") != null ? body.get("exitType").toString() : null;
+            req.exitReason = body.get("exitReason") != null ? body.get("exitReason").toString() : null;
+            req.markedBy = body.get("markedBy") != null ? body.get("markedBy").toString() : "HR";
+            userService.markExit(login.get().getId(), req);
+            return ResponseEntity.ok(ApiResponse.ok("Moved to Exited", service.get(id)));
+        }
+        return ResponseEntity.ok(ApiResponse.ok("Moved to Exited", service.markExitById(id, date)));
+    }
+
+    /** POST /api/v1/hr/employees/{id}/reinstate — undo an exit; restores a linked login too. */
+    @PostMapping("/{id}/reinstate")
+    public ResponseEntity<ApiResponse<Employee>> reinstate(@PathVariable Long id) {
+        Employee e = service.get(id);
+        var login = e.getLinkedUsername() == null ? java.util.Optional.<com.pwj.tracker.model.AppUser>empty()
+                : userRepo.findByUsername(e.getLinkedUsername());
+        if (login.isPresent() && Boolean.TRUE.equals(login.get().getExited())) {
+            userService.reinstate(login.get().getId());
+            return ResponseEntity.ok(ApiResponse.ok("Reinstated", service.get(id)));
+        }
+        return ResponseEntity.ok(ApiResponse.ok("Reinstated", service.reinstateById(id)));
     }
 
     /** GET /api/v1/hr/employees/{id}/stats?range=cycle|30d|all — PR raised + check-in accuracy. */

@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findByUsernameAndActiveTrue(String username);
+    Optional<AppUser> findByUsername(String username);
 
     Optional<AppUser> findBySessionToken(String sessionToken);
 

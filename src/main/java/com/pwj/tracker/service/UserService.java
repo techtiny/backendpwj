@@ -106,6 +106,7 @@ public class UserService {
             try { employeeService.ensureProfileForLogin(user); }
             catch (Exception e) { log.warn("Could not auto-create Employee Master profile for {}: {}", user.getUsername(), e.getMessage()); }
         }
+        user = userRepository.findById(user.getId()).orElse(user); // employee number now mirrors the new person code
         return toResponse(user);
     }
 

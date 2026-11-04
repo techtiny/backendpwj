@@ -3,6 +3,7 @@ package com.pwj.tracker.controller;
 import com.pwj.tracker.dto.ApiResponse;
 import com.pwj.tracker.dto.SalaryDto;
 import com.pwj.tracker.model.EmployeeSalary;
+import com.pwj.tracker.service.SalaryApprovalService;
 import com.pwj.tracker.service.SalaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.util.List;
 public class SalaryController {
 
     private final SalaryService salaryService;
+    private final SalaryApprovalService approvalService;
 
     /** GET /api/v1/hr/salary/structures — every employee + their current structure (or none). */
     @GetMapping("/structures")
@@ -44,6 +46,26 @@ public class SalaryController {
         LocalDate now = LocalDate.now();
         return ResponseEntity.ok(ApiResponse.ok("Salary sheet",
                 salaryService.sheet(year != null ? year : now.getYear(), month != null ? month : now.getMonthValue())));
+    }
+
+    /** GET /api/v1/hr/salary/approval?year=&month= — release-approval state of one month's sheet. */
+    @GetMapping("/approval")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> approval(@RequestParam int year, @RequestParam int month) {
+        return ResponseEntity.ok(ApiResponse.ok("Approval", approvalService.view(year, month)));
+    }
+
+    /** POST /api/v1/hr/salary/approval/approve — body { username }. Admin → OH/VP → CEO (final = released). */
+    @PostMapping("/approval/approve")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> approve(
+            @RequestParam int year, @RequestParam int month, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Approved", approvalService.approve(year, month, body.get("username"))));
+    }
+
+    /** POST /api/v1/hr/salary/approval/reject — body { username, remark }. Sends the chain back to Admin. */
+    @PostMapping("/approval/reject")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> reject(
+            @RequestParam int year, @RequestParam int month, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Rejected", approvalService.reject(year, month, body.get("username"), body.get("remark"))));
     }
 
     /** PATCH /api/v1/hr/salary/sheet/{userId}?year=&month= — HR override for one employee's month. */

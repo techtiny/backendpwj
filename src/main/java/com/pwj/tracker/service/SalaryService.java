@@ -55,6 +55,7 @@ public class SalaryService {
     private final LeaveRequestRepository leaveRepo;
     private final HolidayRepository holidayRepo;
     private final AttendanceRepository attendanceRepo;
+    private final SalaryApprovalService approvalService;
 
     // ── Salary structures ────────────────────────────────────────────────
 
@@ -100,6 +101,15 @@ public class SalaryService {
         if (req.getMonthlyGross() == null || req.getMonthlyGross().signum() <= 0) {
             throw new RuntimeException("Monthly gross must be greater than zero");
         }
+        LocalDate effective = req.getEffectiveFrom() != null ? req.getEffectiveFrom() : LocalDate.now().withDayOfMonth(1);
+        // A released month is locked: a revision effective inside it would silently change its figures.
+        var locked = approvalService.releasedMonthsAffectedBy(effective);
+        if (!locked.isEmpty()) {
+            var l = locked.get(0);
+            throw new RuntimeException("Salary for " + java.time.Month.of(l.getMonth()).getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH)
+                    + " " + l.getYear() + " is already released — set the effective date after its payroll cycle (26th of that month onwards)");
+        }
+        approvalService.resetAllInProgress(); // the sheets change — approvals restart at Admin
         EmployeeSalary s = EmployeeSalary.builder()
                 .userId(user.getId())
                 .employeeNumber(user.getEmployeeNumber())
@@ -146,6 +156,8 @@ public class SalaryService {
 
     @Transactional
     public SalaryDto.SheetRow saveAdjustment(Long userId, int year, int month, SalaryDto.AdjustmentRequest req) {
+        if (approvalService.isReleased(year, month)) throw new RuntimeException("This month's salary is released and locked");
+        approvalService.resetIfInProgress(year, month); // any change restarts the approval chain at Admin
         AppUser user = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         SalaryMonthAdjustment a = adjustmentRepo.findByUserIdAndYearAndMonth(userId, year, month)
                 .orElseGet(() -> SalaryMonthAdjustment.builder().userId(userId).year(year).month(month).finalized(false).build());

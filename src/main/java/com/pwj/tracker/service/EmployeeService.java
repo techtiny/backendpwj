@@ -53,13 +53,7 @@ public class EmployeeService {
         if (code != null) {
             if (employeeRepo.existsByPersonCode(code)) throw new RuntimeException("Person code already exists: " + code);
         } else {
-            int max = 0;
-            for (Employee e : employeeRepo.findAll()) {
-                if (e.getPersonCode() == null) continue;
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile("^H-\\d{2}-(\\d+)$").matcher(e.getPersonCode());
-                if (m.matches()) max = Math.max(max, Integer.parseInt(m.group(1)));
-            }
-            code = String.format("H-%02d-%04d", doj.getYear() % 100, max + 1);
+            code = nextPersonCode(doj);
         }
         String username = str(in.get("linkedUsername"));
         if (username != null) {
@@ -72,7 +66,51 @@ public class EmployeeService {
                 .currentDesignation(str(in.get("designation")))
                 .doj(doj).personCode(code).linkedUsername(username)
                 .build();
-        return employeeRepo.save(e);
+        e = employeeRepo.save(e);
+        syncEmployeeNumber(e);
+        return e;
+    }
+
+    /** Next free person code, H-YY-NNNN: YY is the joining year, NNNN continues the running sequence across years. */
+    private String nextPersonCode(LocalDate doj) {
+        int max = 0;
+        for (Employee e : employeeRepo.findAll()) {
+            if (e.getPersonCode() == null) continue;
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("^H-\\d{2}-(\\d+)$").matcher(e.getPersonCode());
+            if (m.matches()) max = Math.max(max, Integer.parseInt(m.group(1)));
+        }
+        return String.format("H-%02d-%04d", (doj != null ? doj : LocalDate.now()).getYear() % 100, max + 1);
+    }
+
+    /** The person code is the one employee identifier in the portal: a linked login's employee number
+     *  always mirrors it, so every screen that shows an employee number shows the person code. */
+    @Transactional
+    public void syncEmployeeNumber(Employee e) {
+        if (e.getLinkedUsername() == null || e.getPersonCode() == null || e.getPersonCode().isBlank()) return;
+        userRepo.findByUsername(e.getLinkedUsername()).ifPresent(u -> {
+            if (!e.getPersonCode().equals(u.getEmployeeNumber())) {
+                u.setEmployeeNumber(e.getPersonCode());
+                userRepo.save(u);
+            }
+        });
+    }
+
+    /** Startup backfill: linked employees without a person code get one, then every linked login's employee
+     *  number is set to its person code. Idempotent. Returns how many logins changed. */
+    @Transactional
+    public int syncAllPersonCodes() {
+        int changed = 0;
+        for (Employee e : employeeRepo.findAllByOrderByFullNameAsc()) {
+            if (e.getLinkedUsername() == null || e.getLinkedUsername().isBlank()) continue;
+            if (e.getPersonCode() == null || e.getPersonCode().isBlank()) {
+                e.setPersonCode(nextPersonCode(e.getDoj()));
+                employeeRepo.save(e);
+            }
+            String before = userRepo.findByUsername(e.getLinkedUsername()).map(AppUser::getEmployeeNumber).orElse(null);
+            syncEmployeeNumber(e);
+            if (!e.getPersonCode().equals(before) && userRepo.findByUsername(e.getLinkedUsername()).isPresent()) changed++;
+        }
+        return changed;
     }
 
     /** Gives a login its Employee Master record (linked to it) when it has none — so new employees get a profile,
@@ -106,6 +144,25 @@ public class EmployeeService {
             if (e.getDesignationAtExit() == null) e.setDesignationAtExit(e.getDesignation());
             employeeRepo.save(e);
         });
+    }
+
+    /** Moves a master record to Exited by its id — for people with no app login (or when only the master row is
+     *  being updated). Linked logins go through UserService.markExit instead, which also blocks the login. */
+    @Transactional
+    public Employee markExitById(Long id, LocalDate exitDate) {
+        Employee e = get(id);
+        e.setDor(exitDate != null ? exitDate : LocalDate.now());
+        if (e.getDesignationAtExit() == null) e.setDesignationAtExit(e.getDesignation());
+        return employeeRepo.save(e);
+    }
+
+    /** Clears the exit on a master record by its id (undo of markExitById). */
+    @Transactional
+    public Employee reinstateById(Long id) {
+        Employee e = get(id);
+        e.setDor(null);
+        e.setDorRaw(null);
+        return employeeRepo.save(e);
     }
 
     /** A wrongly-exited login was reinstated — clear the exit date that syncExit recorded (a different, older exit is left alone). */
@@ -148,7 +205,9 @@ public class EmployeeService {
                     .orElseThrow(() -> new RuntimeException("No active app user: " + username));
         }
         e.setLinkedUsername(username == null || username.isBlank() ? null : username);
-        return employeeRepo.save(e);
+        e = employeeRepo.save(e);
+        syncEmployeeNumber(e);
+        return e;
     }
 
     /** PR raised + check-in accuracy for one employee, over "cycle" (current 26th-25th payroll
