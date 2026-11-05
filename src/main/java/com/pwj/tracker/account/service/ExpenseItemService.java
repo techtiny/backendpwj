@@ -244,6 +244,11 @@ public class ExpenseItemService {
             throw new IllegalArgumentException("Amount must be greater than zero");
         }
         PwjEntryResponse entry = pwjEntryService.getById(pwjEntryId);
+        // Payment is requested against Purchase Orders only — not Work Orders or Job Orders.
+        if (!"PO".equalsIgnoreCase(entry.getPwjType())) {
+            throw new IllegalArgumentException("Payment can be requested only for a PO document — #" + pwjEntryId + " is a "
+                    + (entry.getPwjType() == null || entry.getPwjType().isBlank() ? "non-PO" : entry.getPwjType()) + " document");
+        }
         boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
                 || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
         if (!issued) {

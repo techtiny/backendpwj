@@ -111,22 +111,13 @@ public class ExpenseItemController {
     }
 
     /**
-     * POST /api/expenses/send-pwj-for-payment
-     * Body: { "pwjEntryId": 123, "amount": 50000, "docNumber": "WO-2627-0004A" }
-     * Procurement: send a payment request straight from an issued PWJ entry — vendor,
-     * doc number and project are auto-derived from the entry. "docNumber" is optional and
-     * targets one specific sub-doc of a multi-vendor/multi-PO entry (e.g. an Additional PO);
-     * omit it to send against the entry's own base doc number as before.
+     * POST /api/expenses/send-pwj-for-payment — retired. Payments are no longer sent straight from procurement: the
+     * engineer who raised the PR requests payment (POST /api/payment-requests), the procurement person the PR is
+     * allocated to approves it, and that approval is what sends it to Accounts → Send for Payment.
      */
     @PostMapping("/send-pwj-for-payment")
     public ResponseEntity<ExpenseItemDto> sendPwjEntryForPayment(@RequestBody Map<String, Object> body) {
-        Long pwjEntryId = Long.valueOf(String.valueOf(body.get("pwjEntryId")));
-        BigDecimal amount = new BigDecimal(String.valueOf(body.get("amount")));
-        String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
-        String paymentMadeAgainst = body.get("paymentMadeAgainst") != null ? String.valueOf(body.get("paymentMadeAgainst")) : null;
-        String paymentStage = body.get("paymentStage") != null ? String.valueOf(body.get("paymentStage")) : null;
-        String docNumber = body.get("docNumber") != null ? String.valueOf(body.get("docNumber")) : null;
-        return ResponseEntity.ok(service.sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage, docNumber));
+        throw new IllegalArgumentException("Payments are now requested by the engineer who raised the PR and approved by the allocated procurement person — use Request Payment");
     }
 
     /**
