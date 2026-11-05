@@ -150,6 +150,13 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.ok("Remark saved", service.addRemark(id, date, rating, notes, actionBy, actorRole, parameter, category)));
     }
 
+    /** DELETE /api/v1/hr/employees/{id}/remarks/{remarkId}?username= — VP any comment; the author only while it is unrated. */
+    @DeleteMapping("/{id}/remarks/{remarkId}")
+    public ResponseEntity<ApiResponse<String>> deleteRemark(@PathVariable Long id, @PathVariable Long remarkId, @RequestParam String username) {
+        service.deleteRemark(id, remarkId, username);
+        return ResponseEntity.ok(ApiResponse.ok("Comment deleted", "deleted"));
+    }
+
     /** POST /api/v1/hr/employees/{id}/remarks/{remarkId}/appeal — body: { text, username }. */
     @PostMapping("/{id}/remarks/{remarkId}/appeal")
     public ResponseEntity<ApiResponse<PerformanceRemark>> appeal(@PathVariable Long id, @PathVariable Long remarkId, @RequestBody Map<String, Object> body) {

@@ -43,9 +43,11 @@ public class SalaryController {
     public ResponseEntity<ApiResponse<List<SalaryDto.SheetRow>>> sheet(
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month) {
-        LocalDate now = LocalDate.now();
+        // Default = the payroll month in hand: the 1st–7th still belongs to last month's salary (finalised until the 7th).
+        LocalDate now = LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
+        LocalDate def = now.getDayOfMonth() <= 7 ? now.minusMonths(1) : now;
         return ResponseEntity.ok(ApiResponse.ok("Salary sheet",
-                salaryService.sheet(year != null ? year : now.getYear(), month != null ? month : now.getMonthValue())));
+                salaryService.sheet(year != null ? year : def.getYear(), month != null ? month : def.getMonthValue())));
     }
 
     /** POST /api/v1/hr/salary/sheet/{userId}/regularize?year=&month= — record an unapplied, unauthorized day as approved leave. */

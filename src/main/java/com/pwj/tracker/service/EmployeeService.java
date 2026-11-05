@@ -11,6 +11,7 @@ import com.pwj.tracker.repository.EmployeeRepository;
 import com.pwj.tracker.repository.PerformanceRemarkRepository;
 import com.pwj.tracker.repository.PwjEntryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -371,6 +373,33 @@ public class EmployeeService {
         return remarkRepo.save(PerformanceRemark.builder()
                 .employeeId(employeeId).remarkDate(date).rating(rating).notes(notes).createdBy(actionBy).createdByRole(actorRole.toUpperCase())
                 .parameter(parameter == null || parameter.isBlank() ? null : parameter.trim()).category(category).build());
+    }
+
+    /** Deletes a performance comment, together with any rating, score or appeal on it. The VP can delete any comment;
+     *  the reviewer who wrote it can delete it only while it is still plain — not rated, accepted or appealed — so a
+     *  scored comment can't quietly disappear without the VP. Reviewers only, and only the CEO for management. */
+    @Transactional
+    public void deleteRemark(Long employeeId, Long remarkId, String username) {
+        Employee emp = get(employeeId);
+        AppUser actor = userRepo.findByUsernameAndActiveTrue(username == null ? "" : username)
+                .orElseThrow(() -> new RuntimeException("Not signed in"));
+        checkReviewer(emp, actor.getRole().name());
+        PerformanceRemark r = remarkRepo.findById(remarkId)
+                .filter(x -> x.getEmployeeId().equals(employeeId))
+                .orElseThrow(() -> new RuntimeException("Comment not found"));
+        boolean vp = actor.getRole() == AppUser.Role.VP;
+        boolean author = r.getCreatedBy() != null
+                && (r.getCreatedBy().equalsIgnoreCase(actor.getFullName()) || r.getCreatedBy().equalsIgnoreCase(actor.getUsername()));
+        boolean plain = r.getRating() == null && r.getAppealedAt() == null && r.getAcknowledgedAt() == null;
+        if (!vp && !(author && plain)) {
+            throw new RuntimeException(author
+                    ? "This comment has already been rated, accepted or appealed — only the VP can delete it"
+                    : "Only the VP, or the person who wrote an unrated comment, can delete it");
+        }
+        log.info("Performance comment {} on employee {} deleted by {} ({}) — rating={}, category={}, text='{}'",
+                remarkId, employeeId, actor.getUsername(), actor.getRole(), r.getRating(), r.getCategory(),
+                r.getNotes() == null ? "" : r.getNotes().replaceAll("\\s+", " "));
+        remarkRepo.delete(r);
     }
 
     /** The employee a remark is about may appeal it once, within 48h of it being recorded;
