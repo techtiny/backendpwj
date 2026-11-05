@@ -77,6 +77,11 @@ public class SalaryAdvance {
     @Column(name = "start_month")
     private Integer startMonth;
 
+    /** True once the start month was set under the "raised on/before the 7th → previous payroll" rule (by Admin's
+     *  choice or by the one-time catch-up). Null on advances paid before that rule existed. */
+    @Column(name = "start_rule_applied")
+    private Boolean startRuleApplied;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

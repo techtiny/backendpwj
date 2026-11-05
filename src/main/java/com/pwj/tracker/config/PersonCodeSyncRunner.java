@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class PersonCodeSyncRunner implements ApplicationRunner {
 
     private final EmployeeService employeeService;
+    private final com.pwj.tracker.service.SalaryAdvanceService advanceService;
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -32,6 +33,12 @@ public class PersonCodeSyncRunner implements ApplicationRunner {
                     "AND (s.employee_number IS NULL OR s.employee_number <> au.employee_number)");
         } catch (Exception e) {
             log.warn("Could not sync employee numbers to person codes: {}", e.getMessage());
+        }
+        try {
+            int moved = advanceService.applyStartRuleToLegacyAdvances();
+            if (moved > 0) log.info("Moved {} paid advance(s) to the payroll month given by the 7th-of-the-month rule", moved);
+        } catch (Exception e) {
+            log.warn("Could not apply the advance start-month rule: {}", e.getMessage());
         }
     }
 }

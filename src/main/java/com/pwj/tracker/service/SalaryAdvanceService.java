@@ -132,6 +132,34 @@ public class SalaryAdvanceService {
         return out;
     }
 
+    /** One-time catch-up for advances paid before the 7th-of-the-month rule: move recovery to the payroll the rule gives,
+     *  but only if nothing has been recovered yet and that month is still open. Each advance is processed once
+     *  (flagged afterwards), so a month Admin picks later is never overridden. Returns how many were moved. */
+    @Transactional
+    public int applyStartRuleToLegacyAdvances() {
+        int moved = 0;
+        for (SalaryAdvance a : repo.findAll()) {
+            if (!"PAID".equals(a.getStatus()) || a.getStartRuleApplied() != null || a.getStartYear() == null) continue;
+            a.setStartRuleApplied(true);
+            LocalDate rule = payrollMonthFor(a.getCreatedAt() != null ? a.getCreatedAt().toLocalDate() : LocalDate.now());
+            LocalDate cur = LocalDate.of(a.getStartYear(), a.getStartMonth(), 1);
+            boolean untouched = true;
+            LocalDate m = cur;
+            for (int i = 0; i < a.getTermMonths(); i++) {
+                if (approvalService.isReleased(m.getYear(), m.getMonthValue())) { untouched = false; break; }
+                m = m.plusMonths(1);
+            }
+            if (rule.isBefore(cur) && untouched && !approvalService.isReleased(rule.getYear(), rule.getMonthValue())) {
+                approvalService.resetIfInProgress(cur.getYear(), cur.getMonthValue());
+                a.setStartYear(rule.getYear()); a.setStartMonth(rule.getMonthValue());
+                approvalService.resetIfInProgress(rule.getYear(), rule.getMonthValue());
+                moved++;
+            }
+            repo.save(a);
+        }
+        return moved;
+    }
+
     private void checkStart(int year, int month) {
         boolean ok = false;
         for (Map<String, Object> o : (List<Map<String, Object>>) startOptions().get("options")) {
@@ -158,7 +186,7 @@ public class SalaryAdvanceService {
         checkStart(year, month);
         a.setStatus("PAID");
         a.setPaidBy(actor.getFullName()); a.setPaidAt(LocalDateTime.now());
-        a.setStartYear(year); a.setStartMonth(month);
+        a.setStartYear(year); a.setStartMonth(month); a.setStartRuleApplied(true);
         approvalService.resetIfInProgress(year, month); // that month's sheet just changed — approvals restart at Admin
         return repo.save(a);
     }
@@ -177,7 +205,7 @@ public class SalaryAdvanceService {
         }
         checkStart(year, month);
         approvalService.resetIfInProgress(a.getStartYear(), a.getStartMonth()); // old start month's sheet changes
-        a.setStartYear(year); a.setStartMonth(month);
+        a.setStartYear(year); a.setStartMonth(month); a.setStartRuleApplied(true);
         approvalService.resetIfInProgress(year, month);
         return repo.save(a);
     }
