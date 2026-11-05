@@ -13,4 +13,6 @@ public interface SalaryApprovalRepository extends JpaRepository<SalaryApproval, 
     List<SalaryApproval> findByReleasedTrue();
 
     List<SalaryApproval> findByReleasedFalse();
+
+    List<SalaryApproval> findByPayoutStatusIsNotNull();
 }

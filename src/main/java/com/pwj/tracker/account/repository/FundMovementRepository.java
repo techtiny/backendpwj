@@ -14,6 +14,10 @@ public interface FundMovementRepository extends JpaRepository<FundMovement, Long
 
     List<FundMovement> findAllByOrderByMovementDateDescIdDesc();
 
+    boolean existsBySourceRef(String sourceRef);
+
+    java.util.Optional<FundMovement> findBySourceRef(String sourceRef);
+
     /** Rows of [projectId, direction, sum(amount)] for every project that has a movement. */
     @Query("SELECT m.projectId, m.direction, COALESCE(SUM(m.amount), 0) " +
            "FROM FundMovement m WHERE m.projectId IS NOT NULL GROUP BY m.projectId, m.direction")

@@ -76,6 +76,13 @@ public class SalaryController {
         return ResponseEntity.ok(ApiResponse.ok("Rejected", approvalService.reject(year, month, body.get("username"), body.get("remark"))));
     }
 
+    /** POST /api/v1/hr/salary/approval/revise — VP only, even after the CEO released the month. body { username, remark }. */
+    @PostMapping("/approval/revise")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> revise(
+            @RequestParam int year, @RequestParam int month, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Sent back to Admin", approvalService.revise(year, month, body.get("username"), body.get("remark"))));
+    }
+
     /** PATCH /api/v1/hr/salary/sheet/{userId}?year=&month= — HR override for one employee's month. */
     @PatchMapping("/sheet/{userId}")
     public ResponseEntity<ApiResponse<SalaryDto.SheetRow>> adjust(

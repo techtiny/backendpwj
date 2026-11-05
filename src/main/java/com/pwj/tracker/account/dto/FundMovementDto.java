@@ -14,6 +14,7 @@ public class FundMovementDto {
     private BigDecimal amount;
     private String mode;            // Mode of Receipt / Payment
     private String remarks;
+    private String sourceRef;       // set for entries created automatically (e.g. SALARY-2026-11)
     private LocalDateTime createdAt;
 
     public FundMovementDto() {}
@@ -36,6 +37,8 @@ public class FundMovementDto {
     public void setMode(String mode) { this.mode = mode; }
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
+    public String getSourceRef() { return sourceRef; }
+    public void setSourceRef(String sourceRef) { this.sourceRef = sourceRef; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

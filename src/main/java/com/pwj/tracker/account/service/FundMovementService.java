@@ -74,8 +74,41 @@ public class FundMovementService {
     }
 
     public void delete(Long id) {
-        if (!repo.existsById(id)) throw new IllegalArgumentException("Fund movement not found: " + id);
+        FundMovement m = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Fund movement not found: " + id));
+        if (m.getSourceRef() != null && m.getSourceRef().startsWith("SALARY-"))
+            throw new IllegalStateException("This entry was created automatically from the approved salary payment and can't be deleted here");
         repo.deleteById(id);
+    }
+
+    /** Removes the Actual Outflow created for a month's approved salary payment — used when the VP revises (reopens)
+     *  that month. System-initiated, so it bypasses the "can't delete by hand" rule. Returns the removed amount, or
+     *  null if the month had no entry. */
+    @Transactional
+    public BigDecimal removeSalaryOutflow(int year, int month) {
+        return repo.findBySourceRef(String.format("SALARY-%d-%02d", year, month)).map(m -> {
+            repo.delete(m);
+            return m.getAmount();
+        }).orElse(null);
+    }
+
+    /** Records the approved salary payment of a month as an Actual Outflow — not tied to any project, so project
+     *  balances and Payment Funding are unaffected. Idempotent: one entry per month. Joins the caller's transaction,
+     *  so if this fails the salary approval rolls back with it. */
+    @Transactional
+    public void recordSalaryOutflow(int year, int month, BigDecimal amount, String remarks) {
+        String ref = String.format("SALARY-%d-%02d", year, month);
+        if (repo.existsBySourceRef(ref)) return;
+        if (amount == null || amount.signum() <= 0) return;
+        FundMovement m = new FundMovement();
+        m.setDirection("OUTFLOW");
+        m.setMovementDate(LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")));
+        m.setParty("Salary — " + java.time.Month.of(month).getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH) + " " + year);
+        m.setProjectId(null);
+        m.setAmount(amount);
+        m.setMode("Bank Transfer / NEFT");
+        m.setRemarks(remarks);
+        m.setSourceRef(ref);
+        repo.save(m);
     }
 
     private BigDecimal safe(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
@@ -230,6 +263,7 @@ public class FundMovementService {
         d.setAmount(m.getAmount());
         d.setMode(m.getMode());
         d.setRemarks(m.getRemarks());
+        d.setSourceRef(m.getSourceRef());
         d.setCreatedAt(m.getCreatedAt());
         return d;
     }

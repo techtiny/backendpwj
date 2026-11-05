@@ -83,6 +83,18 @@ public class SalaryApproval {
     @Column(name = "released_at")
     private LocalDateTime releasedAt;
 
+    // Salary payment (Accounts → Send for Payment): once the CEO releases the month, the net pay of every employee goes
+    // to the VP for approval — only then can the bank Excel be downloaded. Null on months released before this existed.
+    /** PENDING (waiting for the VP), APPROVED (Excel can be downloaded) or REJECTED. */
+    @Column(name = "payout_status", length = 20)
+    private String payoutStatus;
+    @Column(name = "payout_by", length = 150)
+    private String payoutBy;
+    @Column(name = "payout_at")
+    private LocalDateTime payoutAt;
+    @Column(name = "payout_remark", length = 500)
+    private String payoutRemark;
+
     // Last rejection, kept so the sheet can say why it went back to Admin
     @Column(name = "rejected_by", length = 150)
     private String rejectedBy;

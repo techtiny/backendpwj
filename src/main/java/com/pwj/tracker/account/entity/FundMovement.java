@@ -45,6 +45,11 @@ public class FundMovement {
     @Column(length = 1000)
     private String remarks;
 
+    /** Set when the entry was created automatically from another module (e.g. "SALARY-2026-11" for an approved salary
+     *  payment). Such entries can't be deleted by hand. Null for entries a person recorded. */
+    @Column(name = "source_ref", length = 40)
+    private String sourceRef;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -67,6 +72,8 @@ public class FundMovement {
     public void setMode(String mode) { this.mode = mode; }
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
+    public String getSourceRef() { return sourceRef; }
+    public void setSourceRef(String sourceRef) { this.sourceRef = sourceRef; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

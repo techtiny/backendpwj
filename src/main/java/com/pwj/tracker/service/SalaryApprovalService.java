@@ -15,6 +15,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -33,6 +34,8 @@ public class SalaryApprovalService {
     private final AppUserRepository userRepo;
     private final EmployeeSalaryRepository salaryRepo;
     private final ObjectProvider<JavaMailSender> mailSender;
+    // Resolved lazily — the payout service needs the salary sheet, which in turn needs this service.
+    private final ObjectProvider<SalaryPayoutService> payoutService;
 
     @Value("${salary.release.notify:true}")
     private boolean notifyOnRelease;
@@ -70,7 +73,12 @@ public class SalaryApprovalService {
         }
         a.setRejectedBy(null); a.setRejectedRole(null); a.setRejectRemark(null); a.setRejectedAt(null);
         SalaryApproval saved = repo.save(a);
-        if (Boolean.TRUE.equals(saved.getReleased())) notifyEmployees(year, month);
+        if (Boolean.TRUE.equals(saved.getReleased())) {
+            // Freeze everyone's net pay and open the payment for VP approval — in this same transaction, so a
+            // failure rolls the release back rather than leaving a released month with nothing to pay.
+            payoutService.getObject().createLines(year, month);
+            notifyEmployees(year, month);
+        }
         return toView(saved, year, month);
     }
 
@@ -92,6 +100,30 @@ public class SalaryApprovalService {
         if (!allowed) throw new RuntimeException("It is not your turn to review this month's salary");
         clear(a);
         a.setRejectedBy(actor.getFullName()); a.setRejectedRole(role.name());
+        a.setRejectRemark(remark.trim()); a.setRejectedAt(LocalDateTime.now());
+        return toView(repo.save(a), year, month);
+    }
+
+    /** VP reopens a month — before or after the CEO released it. Everything goes back to Admin: approvals are cleared,
+     *  the month is un-released (payslips locked again, sheet editable by Admin), and its salary payment batch is
+     *  withdrawn from Accounts. Allowed even after the VP approved the payment — then the Fund Management outflow for
+     *  the month is removed as well (it is re-created when the corrected salary is approved again). Revising does not
+     *  undo a bank transfer that was already made. */
+    @Transactional
+    public Map<String, Object> revise(int year, int month, String username, String remark) {
+        AppUser actor = actor(username);
+        if (actor.getRole() != AppUser.Role.VP) throw new RuntimeException("Only the VP can revise the salary");
+        if (remark == null || remark.isBlank()) throw new RuntimeException("Enter what needs to be revised");
+        SalaryApproval a = repo.findByYearAndMonth(year, month).orElse(null);
+        if (a == null || (!Boolean.TRUE.equals(a.getAdminApproved()) && !Boolean.TRUE.equals(a.getReleased())))
+            throw new RuntimeException("Nothing to revise yet — the sheet hasn't been approved");
+        boolean wasApproved = "APPROVED".equals(a.getPayoutStatus());
+        BigDecimal removed = payoutService.getObject().withdraw(year, month);
+        if (wasApproved || removed != null)
+            log.info("Salary {}/{} revised by {} after payment approval — removed Fund Management outflow {}", month, year, actor.getFullName(), removed);
+        clear(a);
+        a.setReleased(false); a.setReleasedAt(null);
+        a.setRejectedBy(actor.getFullName()); a.setRejectedRole(actor.getRole().name());
         a.setRejectRemark(remark.trim()); a.setRejectedAt(LocalDateTime.now());
         return toView(repo.save(a), year, month);
     }
@@ -174,6 +206,7 @@ public class SalaryApprovalService {
         m.put("vpAt", a != null ? (a.getVpAt() != null ? a.getVpAt() : (vp ? a.getReviewAt() : null)) : null);
         m.put("ceoApproved", ceo); m.put("ceoBy", a != null ? a.getCeoBy() : null); m.put("ceoAt", a != null ? a.getCeoAt() : null);
         m.put("released", a != null && Boolean.TRUE.equals(a.getReleased()));
+        m.put("payoutStatus", a != null ? a.getPayoutStatus() : null);   // PENDING / APPROVED / REJECTED once released
         m.put("releasedAt", a != null ? a.getReleasedAt() : null);
         // Who acts next: ADMIN → REVIEW (OH/VP) → CEO → none
         m.put("nextStep", ceo ? "NONE" : (oh && vp) ? "CEO" : admin ? "OH_VP" : "ADMIN");
