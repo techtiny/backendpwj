@@ -34,6 +34,7 @@ public class EmployeeController {
      *  department, designation, personCode (auto when blank), linkedUsername (optional). */
     @PostMapping
     public ResponseEntity<ApiResponse<Employee>> create(@RequestBody Map<String, Object> body) {
+        if (hasBank(body)) service.requireBankEditor(body.get("actorUsername") != null ? body.get("actorUsername").toString() : null);
         return ResponseEntity.ok(ApiResponse.ok("Employee added", service.create(body)));
     }
 
@@ -59,7 +60,18 @@ public class EmployeeController {
     /** PATCH /api/v1/hr/employees/{id} — edit details: fullName, doj, dob, gender, department, designation, personCode. */
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<Employee>> update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        if (hasBank(body)) service.requireBankEditor(body.get("actorUsername") != null ? body.get("actorUsername").toString() : null);
         return ResponseEntity.ok(ApiResponse.ok("Employee updated", service.update(id, body)));
+    }
+
+    /** GET /api/v1/hr/employees/{id}/bank-details?username= — bank name, account number, IFSC (reviewers / the employee only). */
+    @GetMapping("/{id}/bank-details")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> bankDetails(@PathVariable Long id, @RequestParam String username) {
+        return ResponseEntity.ok(ApiResponse.ok("Bank details", service.bankDetails(id, username)));
+    }
+
+    private static boolean hasBank(Map<String, Object> b) {
+        return b.containsKey("bankName") || b.containsKey("bankAccountNumber") || b.containsKey("ifscCode");
     }
 
     /** PATCH /api/v1/hr/employees/{id}/link — body: { username } (or null/blank to unlink).

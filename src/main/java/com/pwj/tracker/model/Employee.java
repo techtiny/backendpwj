@@ -1,5 +1,6 @@
 package com.pwj.tracker.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -84,6 +85,20 @@ public class Employee {
      *  never-logged-in employees. Powers PR-raised and attendance stats on the profile. */
     @Column(name = "linked_username", length = 100)
     private String linkedUsername;
+
+    /** Salary-credit bank details. Kept out of every JSON response (@JsonIgnore) — they are only served by the
+     *  access-checked GET /{id}/bank-details endpoint, never with the roster. */
+    @JsonIgnore
+    @Column(name = "bank_name", length = 100)
+    private String bankName;
+
+    @JsonIgnore
+    @Column(name = "bank_account_number", length = 30)
+    private String bankAccountNumber;
+
+    @JsonIgnore
+    @Column(name = "ifsc_code", length = 15)
+    private String ifscCode;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

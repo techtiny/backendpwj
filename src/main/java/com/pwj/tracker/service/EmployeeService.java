@@ -65,6 +65,9 @@ public class EmployeeService {
                 .department(str(in.get("department"))).designation(str(in.get("designation")))
                 .currentDesignation(str(in.get("designation")))
                 .doj(doj).personCode(code).linkedUsername(username)
+                .bankName(str(in.get("bankName")))
+                .bankAccountNumber(cleanAccount(str(in.get("bankAccountNumber"))))
+                .ifscCode(cleanIfsc(str(in.get("ifscCode"))))
                 .build();
         e = employeeRepo.save(e);
         syncEmployeeNumber(e);
@@ -96,6 +99,9 @@ public class EmployeeService {
             e.setDesignation(d);
             e.setCurrentDesignation(d);
         }
+        if (in.containsKey("bankName")) e.setBankName(str(in.get("bankName")));
+        if (in.containsKey("bankAccountNumber")) e.setBankAccountNumber(cleanAccount(str(in.get("bankAccountNumber"))));
+        if (in.containsKey("ifscCode")) e.setIfscCode(cleanIfsc(str(in.get("ifscCode"))));
         if (in.containsKey("personCode")) {
             String code = str(in.get("personCode"));
             if (code != null && !code.equals(e.getPersonCode())) {
@@ -106,6 +112,43 @@ public class EmployeeService {
         e = employeeRepo.save(e);
         syncEmployeeNumber(e);
         return e;
+    }
+
+    /** Bank account number: digits only, 9-18 long (blank clears it). */
+    private static String cleanAccount(String v) {
+        if (v == null) return null;
+        String d = v.replaceAll("[\\s-]", "");
+        if (!d.matches("\\d{9,18}")) throw new RuntimeException("Account number must be 9 to 18 digits");
+        return d;
+    }
+
+    /** IFSC: 4 letters, a zero, then 6 letters/digits — stored upper-case (blank clears it). */
+    private static String cleanIfsc(String v) {
+        if (v == null) return null;
+        String c = v.replaceAll("\\s", "").toUpperCase();
+        if (!c.matches("[A-Z]{4}0[A-Z0-9]{6}")) throw new RuntimeException("IFSC must look like HDFC0001234 (4 letters, 0, then 6 letters/digits)");
+        return c;
+    }
+
+    /** Bank details of one employee — only for reviewers (Admin / VP / OH / CEO) or the employee themself. */
+    public Map<String, Object> bankDetails(Long id, String username) {
+        Employee e = get(id);
+        AppUser u = username == null ? null : userRepo.findByUsername(username).orElse(null);
+        boolean reviewer = u != null && List.of(AppUser.Role.ADMIN, AppUser.Role.VP, AppUser.Role.OH, AppUser.Role.CEO).contains(u.getRole());
+        boolean self = u != null && e.getLinkedUsername() != null && e.getLinkedUsername().equalsIgnoreCase(u.getUsername());
+        if (!reviewer && !self) throw new RuntimeException("You can't view these bank details");
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("bankName", e.getBankName());
+        m.put("bankAccountNumber", e.getBankAccountNumber());
+        m.put("ifscCode", e.getIfscCode());
+        return m;
+    }
+
+    /** Only Admin / VP / OH / CEO may set bank details. */
+    public void requireBankEditor(String username) {
+        AppUser u = username == null ? null : userRepo.findByUsername(username).orElse(null);
+        if (u == null || !List.of(AppUser.Role.ADMIN, AppUser.Role.VP, AppUser.Role.OH, AppUser.Role.CEO).contains(u.getRole()))
+            throw new RuntimeException("Only Admin, VP, OH or CEO can change bank details");
     }
 
     /** Next free person code, H-YY-NNNN: YY is the joining year, NNNN continues the running sequence across years. */
