@@ -57,7 +57,22 @@ public class SalaryAdvanceController {
     /** PUT /api/v1/hr/advance/{id}/paid — Admin: money transferred, repayment starts. */
     @PutMapping("/{id}/paid")
     public ResponseEntity<ApiResponse<SalaryAdvance>> paid(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        return ResponseEntity.ok(ApiResponse.ok("Marked as paid", service.markPaid(id, str(body.get("username")))));
+        Integer y = body.get("startYear") != null ? Integer.valueOf(body.get("startYear").toString()) : null;
+        Integer m = body.get("startMonth") != null ? Integer.valueOf(body.get("startMonth").toString()) : null;
+        return ResponseEntity.ok(ApiResponse.ok("Marked as paid", service.markPaid(id, str(body.get("username")), y, m)));
+    }
+
+    /** GET /api/v1/hr/advance/start-options — payroll months recovery can start in, plus the default. */
+    @GetMapping("/start-options")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> startOptions(@RequestParam(required = false) Long advanceId) {
+        return ResponseEntity.ok(ApiResponse.ok("Start options", service.startOptions(advanceId)));
+    }
+
+    /** PUT /api/v1/hr/advance/{id}/start — Admin: move recovery to another payroll month (before anything is recovered). */
+    @PutMapping("/{id}/start")
+    public ResponseEntity<ApiResponse<SalaryAdvance>> changeStart(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Start month updated", service.changeStart(id, str(body.get("username")),
+                Integer.parseInt(body.get("startYear").toString()), Integer.parseInt(body.get("startMonth").toString()))));
     }
 
     @PutMapping("/{id}/cancel")

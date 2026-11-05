@@ -7,8 +7,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * Release approval for one month's salary sheet: Admin approves first, then OH or VP, then the CEO
- * gives the final approval — which releases the month (locks edits, enables payslips, notifies employees).
+ * Release approval for one month's salary sheet: Admin approves first, then OH and VP each approve on their own
+ * (independent of each other), then the CEO gives the final approval — which releases the month (locks edits, enables payslips, notifies employees).
  * Any rejection, or any change to the sheet before release, sends the chain back to Admin.
  */
 @Entity
@@ -39,7 +39,24 @@ public class SalaryApproval {
     @Column(name = "admin_at")
     private LocalDateTime adminAt;
 
-    // Step 2 — OH or VP (whichever acts first)
+    // Step 2a — OH, and 2b — VP: separate approvals, neither depends on the other
+    @Column(name = "oh_approved", nullable = false)
+    @Builder.Default
+    private Boolean ohApproved = false;
+    @Column(name = "oh_by", length = 150)
+    private String ohBy;
+    @Column(name = "oh_at")
+    private LocalDateTime ohAt;
+
+    @Column(name = "vp_approved", nullable = false)
+    @Builder.Default
+    private Boolean vpApproved = false;
+    @Column(name = "vp_by", length = 150)
+    private String vpBy;
+    @Column(name = "vp_at")
+    private LocalDateTime vpAt;
+
+    // Legacy single "OH or VP" approval (before OH and VP became separate) — read only, to show old records
     @Column(name = "review_approved", nullable = false)
     @Builder.Default
     private Boolean reviewApproved = false;

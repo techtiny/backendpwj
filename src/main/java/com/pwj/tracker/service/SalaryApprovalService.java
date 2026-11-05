@@ -54,13 +54,19 @@ public class SalaryApprovalService {
         if (!Boolean.TRUE.equals(a.getAdminApproved())) {
             if (role != AppUser.Role.ADMIN) throw new RuntimeException("Admin must approve first");
             a.setAdminApproved(true); a.setAdminBy(actor.getFullName()); a.setAdminAt(now);
-        } else if (!Boolean.TRUE.equals(a.getReviewApproved())) {
-            if (role != AppUser.Role.OH && role != AppUser.Role.VP) throw new RuntimeException("OH or VP must approve next");
-            a.setReviewApproved(true); a.setReviewBy(actor.getFullName()); a.setReviewRole(role.name()); a.setReviewAt(now);
-        } else {
-            if (role != AppUser.Role.CEO) throw new RuntimeException("The CEO gives the final approval");
+        } else if (role == AppUser.Role.OH) {
+            if (Boolean.TRUE.equals(a.getOhApproved())) throw new RuntimeException("OH has already approved");
+            a.setOhApproved(true); a.setOhBy(actor.getFullName()); a.setOhAt(now);
+        } else if (role == AppUser.Role.VP) {
+            if (Boolean.TRUE.equals(a.getVpApproved())) throw new RuntimeException("VP has already approved");
+            a.setVpApproved(true); a.setVpBy(actor.getFullName()); a.setVpAt(now);
+        } else if (role == AppUser.Role.CEO) {
+            if (!Boolean.TRUE.equals(a.getOhApproved()) || !Boolean.TRUE.equals(a.getVpApproved()))
+                throw new RuntimeException("The CEO gives the final approval after both OH and VP have approved");
             a.setCeoApproved(true); a.setCeoBy(actor.getFullName()); a.setCeoAt(now);
             a.setReleased(true); a.setReleasedAt(now);
+        } else {
+            throw new RuntimeException("Admin has already approved — waiting for OH, VP and then the CEO");
         }
         a.setRejectedBy(null); a.setRejectedRole(null); a.setRejectRemark(null); a.setRejectedAt(null);
         SalaryApproval saved = repo.save(a);
@@ -76,9 +82,13 @@ public class SalaryApprovalService {
         SalaryApproval a = getOrCreate(year, month);
         if (Boolean.TRUE.equals(a.getReleased())) throw new RuntimeException("This month's salary is already released");
         AppUser.Role role = actor.getRole();
-        boolean allowed = !Boolean.TRUE.equals(a.getAdminApproved()) ? role == AppUser.Role.ADMIN
-                : !Boolean.TRUE.equals(a.getReviewApproved()) ? (role == AppUser.Role.OH || role == AppUser.Role.VP)
-                : role == AppUser.Role.CEO;
+        boolean admin = Boolean.TRUE.equals(a.getAdminApproved());
+        boolean oh = Boolean.TRUE.equals(a.getOhApproved()), vp = Boolean.TRUE.equals(a.getVpApproved());
+        // Anyone whose turn it is may send the sheet back: OH / VP while their own approval is pending, the CEO at the end.
+        boolean allowed = !admin ? role == AppUser.Role.ADMIN
+                : role == AppUser.Role.OH ? !oh
+                : role == AppUser.Role.VP ? !vp
+                : role == AppUser.Role.CEO && oh && vp;
         if (!allowed) throw new RuntimeException("It is not your turn to review this month's salary");
         clear(a);
         a.setRejectedBy(actor.getFullName()); a.setRejectedRole(role.name());
@@ -122,6 +132,8 @@ public class SalaryApprovalService {
 
     private void clear(SalaryApproval a) {
         a.setAdminApproved(false); a.setAdminBy(null); a.setAdminAt(null);
+        a.setOhApproved(false); a.setOhBy(null); a.setOhAt(null);
+        a.setVpApproved(false); a.setVpBy(null); a.setVpAt(null);
         a.setReviewApproved(false); a.setReviewBy(null); a.setReviewRole(null); a.setReviewAt(null);
         a.setCeoApproved(false); a.setCeoBy(null); a.setCeoAt(null);
     }
@@ -139,17 +151,25 @@ public class SalaryApprovalService {
     private Map<String, Object> toView(SalaryApproval a, int year, int month) {
         Map<String, Object> m = new LinkedHashMap<>();
         boolean admin = a != null && Boolean.TRUE.equals(a.getAdminApproved());
-        boolean review = a != null && Boolean.TRUE.equals(a.getReviewApproved());
         boolean ceo = a != null && Boolean.TRUE.equals(a.getCeoApproved());
+        boolean released = a != null && Boolean.TRUE.equals(a.getReleased());
+        boolean legacy = a != null && Boolean.TRUE.equals(a.getReviewApproved());   // old single OH-or-VP approval
+        // A month released under the old single approval counts as both OH and VP having signed off.
+        boolean oh = a != null && (Boolean.TRUE.equals(a.getOhApproved()) || (legacy && ("OH".equals(a.getReviewRole()) || released)));
+        boolean vp = a != null && (Boolean.TRUE.equals(a.getVpApproved()) || (legacy && ("VP".equals(a.getReviewRole()) || released)));
         m.put("year", year); m.put("month", month);
         m.put("adminApproved", admin); m.put("adminBy", a != null ? a.getAdminBy() : null); m.put("adminAt", a != null ? a.getAdminAt() : null);
-        m.put("reviewApproved", review); m.put("reviewBy", a != null ? a.getReviewBy() : null);
-        m.put("reviewRole", a != null ? a.getReviewRole() : null); m.put("reviewAt", a != null ? a.getReviewAt() : null);
+        m.put("ohApproved", oh);
+        m.put("ohBy", a != null ? (a.getOhBy() != null ? a.getOhBy() : (oh ? a.getReviewBy() : null)) : null);
+        m.put("ohAt", a != null ? (a.getOhAt() != null ? a.getOhAt() : (oh ? a.getReviewAt() : null)) : null);
+        m.put("vpApproved", vp);
+        m.put("vpBy", a != null ? (a.getVpBy() != null ? a.getVpBy() : (vp ? a.getReviewBy() : null)) : null);
+        m.put("vpAt", a != null ? (a.getVpAt() != null ? a.getVpAt() : (vp ? a.getReviewAt() : null)) : null);
         m.put("ceoApproved", ceo); m.put("ceoBy", a != null ? a.getCeoBy() : null); m.put("ceoAt", a != null ? a.getCeoAt() : null);
         m.put("released", a != null && Boolean.TRUE.equals(a.getReleased()));
         m.put("releasedAt", a != null ? a.getReleasedAt() : null);
         // Who acts next: ADMIN → REVIEW (OH/VP) → CEO → none
-        m.put("nextStep", ceo ? "NONE" : review ? "CEO" : admin ? "OH_VP" : "ADMIN");
+        m.put("nextStep", ceo ? "NONE" : (oh && vp) ? "CEO" : admin ? "OH_VP" : "ADMIN");
         m.put("rejectedBy", a != null ? a.getRejectedBy() : null);
         m.put("rejectedRole", a != null ? a.getRejectedRole() : null);
         m.put("rejectRemark", a != null ? a.getRejectRemark() : null);

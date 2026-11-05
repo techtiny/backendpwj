@@ -93,23 +93,92 @@ public class SalaryAdvanceService {
         return repo.save(a);
     }
 
-    /** Admin has transferred the money: repayment starts with the next salary that hasn't been released yet. */
+    /** Which payroll an advance raised on this date belongs to. Salary for month M covers the 26th of M-1 to the 25th
+     *  of M and is still being finalised until about the 7th of M+1 — so an advance raised on or before the 7th goes
+     *  on the previous month's payroll, one raised from the 8th to the 25th on this month's, and one raised after
+     *  the 25th on next month's. */
+    static LocalDate payrollMonthFor(LocalDate raised) {
+        LocalDate first = raised.withDayOfMonth(1);
+        if (raised.getDayOfMonth() <= 7) return first.minusMonths(1);
+        if (raised.getDayOfMonth() <= 25) return first;
+        return first.plusMonths(1);
+    }
+
+    public Map<String, Object> startOptions() { return startOptions(null); }
+
+    /** Payroll months an advance can start recovering in: the previous, the current and the next cycle — released
+     *  months are listed but locked. The default follows the 7th-of-the-month rule above, using the date the advance
+     *  was raised, moved forward to the first month still open if that one is already released. */
+    public Map<String, Object> startOptions(Long advanceId) {
+        LocalDate today = LocalDate.now();
+        LocalDate raised = advanceId == null ? today
+                : repo.findById(advanceId).map(a -> a.getCreatedAt() != null ? a.getCreatedAt().toLocalDate() : today).orElse(today);
+        LocalDate ruleMonth = payrollMonthFor(raised);
+        // Payroll month M covers the 26th of the previous month to the 25th of M.
+        LocalDate cur = today.getDayOfMonth() > 25 ? today.plusMonths(1).withDayOfMonth(1) : today.withDayOfMonth(1);
+        List<Map<String, Object>> options = new ArrayList<>();
+        Map<String, Object> def = null;
+        for (int d = -1; d <= 1; d++) {
+            LocalDate m = cur.plusMonths(d);
+            boolean released = approvalService.isReleased(m.getYear(), m.getMonthValue());
+            Map<String, Object> o = new LinkedHashMap<>();
+            o.put("year", m.getYear()); o.put("month", m.getMonthValue()); o.put("released", released);
+            options.add(o);
+            if (def == null && !released && !m.isBefore(ruleMonth)) def = o;
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("options", options);
+        out.put("default", def);
+        return out;
+    }
+
+    private void checkStart(int year, int month) {
+        boolean ok = false;
+        for (Map<String, Object> o : (List<Map<String, Object>>) startOptions().get("options")) {
+            if ((int) o.get("year") == year && (int) o.get("month") == month) { ok = !(boolean) o.get("released"); }
+        }
+        if (!ok) throw new RuntimeException("Pick a payroll month that isn't released yet (previous, current or next month)");
+    }
+
+    /** Admin has transferred the money: repayment starts in the payroll month Admin picks (default: the earliest one
+     *  not yet released). */
     @Transactional
-    public SalaryAdvance markPaid(Long id, String username) {
+    public SalaryAdvance markPaid(Long id, String username, Integer startYear, Integer startMonth) {
         AppUser actor = actor(username);
         if (actor.getRole() != AppUser.Role.ADMIN) throw new RuntimeException("Only Admin can mark an advance as paid");
         SalaryAdvance a = get(id);
         if (!"APPROVED".equals(a.getStatus())) throw new RuntimeException("Only an approved advance can be marked paid");
-        LocalDate today = LocalDate.now();
-        // Payroll month M covers the 26th of the previous month to the 25th of M — an advance paid after the 25th
-        // belongs to the next month's salary, and a month already released can no longer take a deduction.
-        int year = today.getYear(), month = today.getMonthValue();
-        if (today.getDayOfMonth() > 25) { LocalDate n = today.plusMonths(1); year = n.getYear(); month = n.getMonthValue(); }
-        while (approvalService.isReleased(year, month)) { LocalDate n = LocalDate.of(year, month, 1).plusMonths(1); year = n.getYear(); month = n.getMonthValue(); }
+        int year, month;
+        if (startYear != null && startMonth != null) { year = startYear; month = startMonth; }
+        else {
+            Map<String, Object> d = (Map<String, Object>) startOptions(id).get("default");
+            if (d == null) throw new RuntimeException("Every nearby payroll month is released — nothing to deduct from yet");
+            year = (int) d.get("year"); month = (int) d.get("month");
+        }
+        checkStart(year, month);
         a.setStatus("PAID");
         a.setPaidBy(actor.getFullName()); a.setPaidAt(LocalDateTime.now());
         a.setStartYear(year); a.setStartMonth(month);
         approvalService.resetIfInProgress(year, month); // that month's sheet just changed — approvals restart at Admin
+        return repo.save(a);
+    }
+
+    /** Admin moves where recovery starts — only while no instalment has been recovered (none of its months released). */
+    @Transactional
+    public SalaryAdvance changeStart(Long id, String username, int year, int month) {
+        AppUser actor = actor(username);
+        if (actor.getRole() != AppUser.Role.ADMIN) throw new RuntimeException("Only Admin can change the start month");
+        SalaryAdvance a = get(id);
+        if (!"PAID".equals(a.getStatus())) throw new RuntimeException("Only a paid advance has a start month");
+        int y = a.getStartYear(), mo = a.getStartMonth();
+        for (int i = 0; i < a.getTermMonths(); i++) {
+            if (approvalService.isReleased(y, mo)) throw new RuntimeException("An instalment has already been recovered in a released month — the start can't move");
+            LocalDate n = LocalDate.of(y, mo, 1).plusMonths(1); y = n.getYear(); mo = n.getMonthValue();
+        }
+        checkStart(year, month);
+        approvalService.resetIfInProgress(a.getStartYear(), a.getStartMonth()); // old start month's sheet changes
+        a.setStartYear(year); a.setStartMonth(month);
+        approvalService.resetIfInProgress(year, month);
         return repo.save(a);
     }
 
