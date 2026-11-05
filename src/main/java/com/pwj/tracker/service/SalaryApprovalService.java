@@ -103,6 +103,13 @@ public class SalaryApprovalService {
         return repo.findByYearAndMonth(year, month).map(a -> Boolean.TRUE.equals(a.getReleased())).orElse(false);
     }
 
+    /** The sheet is in review: Admin has approved it and the chain hasn't been released or sent back. Nobody can edit
+     *  it then — editing opens again (for Admin only) when OH / VP / CEO rejects it. */
+    public boolean isLockedForReview(int year, int month) {
+        return repo.findByYearAndMonth(year, month)
+                .map(a -> Boolean.TRUE.equals(a.getAdminApproved()) && !Boolean.TRUE.equals(a.getReleased())).orElse(false);
+    }
+
     /** Any change to the sheet before release restarts the chain at Admin. */
     @Transactional
     public void resetIfInProgress(int year, int month) {

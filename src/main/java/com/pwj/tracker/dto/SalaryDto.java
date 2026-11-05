@@ -90,5 +90,6 @@ public class SalaryDto {
         public String remarks;
         public Boolean finalized;
         public String actionBy;
+        public String username;      // who is editing — only Admin may
     }
 }

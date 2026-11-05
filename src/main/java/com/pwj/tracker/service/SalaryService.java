@@ -128,6 +128,17 @@ public class SalaryService {
         return salaryRepo.save(s);
     }
 
+    /** Only Admin edits the sheet, and only while it isn't in review or released: once Admin approves it, it is locked
+     *  until OH / VP / CEO rejects it (back to Admin) or the CEO releases it. */
+    private void requireSheetEditor(String username, int year, int month) {
+        AppUser u = userRepo.findByUsernameAndActiveTrue(username == null ? "" : username)
+                .orElseThrow(() -> new RuntimeException("Not signed in"));
+        if (u.getRole() != AppUser.Role.ADMIN) throw new RuntimeException("Only Admin can edit the salary sheet");
+        if (approvalService.isReleased(year, month)) throw new RuntimeException("This month's salary is released and locked");
+        if (approvalService.isLockedForReview(year, month))
+            throw new RuntimeException("The sheet is locked while it is in review — it opens for editing again only if OH, VP or the CEO rejects it");
+    }
+
     // ── Monthly salary sheet ─────────────────────────────────────────────
 
     /** The payroll cycle for (year, month): the 26th of the previous month through the 25th of this one. */
@@ -159,8 +170,7 @@ public class SalaryService {
 
     @Transactional
     public SalaryDto.SheetRow saveAdjustment(Long userId, int year, int month, SalaryDto.AdjustmentRequest req) {
-        if (approvalService.isReleased(year, month)) throw new RuntimeException("This month's salary is released and locked");
-        approvalService.resetIfInProgress(year, month); // any change restarts the approval chain at Admin
+        requireSheetEditor(req.getUsername(), year, month);
         AppUser user = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         SalaryMonthAdjustment a = adjustmentRepo.findByUserIdAndYearAndMonth(userId, year, month)
                 .orElseGet(() -> SalaryMonthAdjustment.builder().userId(userId).year(year).month(month).finalized(false).build());
@@ -185,11 +195,8 @@ public class SalaryService {
      *  (the free CL, then LOP at 1x) instead of an unauthorized absence at 1.5x with no free CL. */
     @Transactional
     public SalaryDto.SheetRow regularizeAbsence(Long userId, int year, int month, SalaryDto.RegularizeRequest req) {
-        if (approvalService.isReleased(year, month)) throw new RuntimeException("This month's salary is released and locked");
-        AppUser actor = userRepo.findByUsernameAndActiveTrue(req.getUsername() == null ? "" : req.getUsername())
-                .orElseThrow(() -> new RuntimeException("Not signed in"));
-        if (actor.getRole() != AppUser.Role.ADMIN && actor.getRole() != AppUser.Role.VP)
-            throw new RuntimeException("Only Admin or VP can record leave on an employee's behalf");
+        requireSheetEditor(req.getUsername(), year, month);
+        AppUser actor = userRepo.findByUsernameAndActiveTrue(req.getUsername()).orElseThrow(() -> new RuntimeException("Not signed in"));
         AppUser user = userRepo.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         if (req.getDate() == null) throw new RuntimeException("Pick the date");
         String type = req.getLeaveType() == null || req.getLeaveType().isBlank() ? "CASUAL" : req.getLeaveType().trim().toUpperCase();
