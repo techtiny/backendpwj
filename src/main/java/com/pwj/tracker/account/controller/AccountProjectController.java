@@ -96,24 +96,14 @@ public class AccountProjectController {
         BigDecimal totalExpensesActual = totPaid.add(balanceActual);
 
         // GST: As per PO is not tracked at the document level — left blank.
-        // Actual GST uses the same formula as the Project-wise "Total GST" card:
-        // PWJ-doc GST (PO/WO/JO gstAmount) + vendor GST (expense_items.vendorGstAmount)
+        // Actual GST = the "Total GST" (vendor GST) shown on each Expenses tab, summed across all tabs.
         BigDecimal gstPwj = null;
         BigDecimal vendorGst = BigDecimal.ZERO;
         List<Object[]> gstRows = expenseRepo.getGstTotalsByProject(id);
         if (!gstRows.isEmpty()) {
             vendorGst = dec(gstRows.get(0)[1]);
         }
-        BigDecimal pwjDocGst = BigDecimal.ZERO;
-        Map<String, Map<String, Double>> budgetSummary = pwjEntryService.getBudgetSummary(null);
-        for (Map.Entry<String, Map<String, Double>> e : budgetSummary.entrySet()) {
-            if (e.getKey() != null && e.getKey().trim().equalsIgnoreCase(proj.getName().trim())) {
-                Double gst = e.getValue().get("gst");
-                if (gst != null) pwjDocGst = BigDecimal.valueOf(gst);
-                break;
-            }
-        }
-        BigDecimal gstActual = pwjDocGst.add(vendorGst);
+        BigDecimal gstActual = vendorGst;
 
         // Gross expenses for P&L = total expenses (actual), net of GST (GST is pass-through, not a real cost)
         BigDecimal grossExpensesActual = totalExpensesActual.subtract(gstActual);
