@@ -79,10 +79,13 @@ public class ExpenseItemService {
         return toDto(repo.save(e));
     }
 
+    private static final List<String> ALL_CATEGORIES =
+        List.of("MATERIAL", "LABOUR", "SUBCONTRACT", "CONSULTANTS", "MISCELLANEOUS");
+    // PO / WO / JO entries can be placed in any Expense tab
     private static final Map<String, List<String>> ALLOWED_CATEGORIES = Map.of(
-        "PO", List.of("MATERIAL"),
-        "WO", List.of("SUBCONTRACT", "LABOUR", "CONSULTANTS"),
-        "JO", List.of("MATERIAL", "LABOUR", "MISCELLANEOUS")
+        "PO", ALL_CATEGORIES,
+        "WO", ALL_CATEGORIES,
+        "JO", ALL_CATEGORIES
     );
 
     private String defaultCategoryFor(String paymentAgainst) {
