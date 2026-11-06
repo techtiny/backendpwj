@@ -109,7 +109,7 @@ public class HrNotificationService {
         // Salary payment waiting for the VP (Accounts → Team Payments)
         if (role == AppUser.Role.VP) {
             long n = salaryApprovalRepo.findByPayoutStatusIsNotNull().stream().filter(a -> "PENDING".equals(a.getPayoutStatus())).count();
-            if (n > 0) out.add(item("salary-pay", n, n == 1 ? "1 salary payment" : n + " salary payments", "awaiting your approval in Accounts → Send for Payment → Team Payments", "account", null));
+            if (n > 0) out.add(item("salary-pay", n, n == 1 ? "1 salary payment" : n + " salary payments", "awaiting your approval in Accounts → Send for Payment → Team Payments", "account", "payments"));
         }
 
         // Performance feedback: reviewers decide appeals and rate; employees accept or appeal their own comments
