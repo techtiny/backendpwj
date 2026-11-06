@@ -80,5 +80,24 @@ public class SalaryAdvanceController {
         return ResponseEntity.ok(ApiResponse.ok("Advance cancelled", service.cancel(id, str(body.get("username")))));
     }
 
+    /** GET /api/v1/hr/advance/enabled/{username} — is salary advance switched on for this person? */
+    @GetMapping("/enabled/{username}")
+    public ResponseEntity<ApiResponse<Boolean>> enabled(@PathVariable String username) {
+        return ResponseEntity.ok(ApiResponse.ok("Advance enabled", service.isEnabled(username)));
+    }
+
+    /** GET /api/v1/hr/advance/eligibility?username= — Admin / VP: everyone with their advance switch. */
+    @GetMapping("/eligibility")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> eligibility(@RequestParam String username) {
+        return ResponseEntity.ok(ApiResponse.ok("Advance eligibility", service.eligibility(username)));
+    }
+
+    /** PUT /api/v1/hr/advance/eligibility/{target} — Admin / VP. body: username (actor), enabled. */
+    @PutMapping("/eligibility/{target}")
+    public ResponseEntity<ApiResponse<Void>> setEnabled(@PathVariable String target, @RequestBody Map<String, Object> body) {
+        service.setEnabled(str(body.get("username")), target, Boolean.parseBoolean(String.valueOf(body.get("enabled"))));
+        return ResponseEntity.ok(ApiResponse.ok("Updated", null));
+    }
+
     private static String str(Object o) { return o == null ? null : o.toString(); }
 }

@@ -4,6 +4,7 @@ import com.pwj.tracker.model.AppUser;
 import com.pwj.tracker.model.PerformanceRemark;
 import com.pwj.tracker.model.PettyCash;
 import com.pwj.tracker.model.SalaryApproval;
+import com.pwj.tracker.repository.SalaryStatementRequestRepository;
 import com.pwj.tracker.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class HrNotificationService {
     private final EmployeeRepository employeeRepo;
     private final PerformanceRemarkRepository remarkRepo;
     private final EmployeeService employeeService;
+    private final SalaryStatementRequestRepository statementRepo;
 
     public List<Map<String, Object>> forUser(String username) {
         AppUser u = userRepo.findByUsernameAndActiveTrue(username == null ? "" : username)
@@ -52,6 +54,13 @@ public class HrNotificationService {
             long n = leaveRepo.findByStatusOrderByCreatedAtDesc("PENDING").stream()
                     .filter(l -> !me.equalsIgnoreCase(l.getUsername())).count();
             add(out, "leave", n, "leave / permission request", "awaiting your approval", "hr", "approvals");
+        }
+
+        // Salary statements waiting for Admin / VP approval
+        if (role == AppUser.Role.ADMIN || role == AppUser.Role.VP) {
+            long n = statementRepo.findByStatusOrderByCreatedAtDesc("PENDING").stream()
+                    .filter(r -> !me.equalsIgnoreCase(r.getUsername())).count();
+            add(out, "statement", n, "salary statement request", "awaiting your approval", "hr", "salary-statements");
         }
 
         // Petty cash and reimbursement

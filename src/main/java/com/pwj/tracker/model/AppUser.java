@@ -50,6 +50,11 @@ public class AppUser {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
+    // Salary advance is off for everyone until an Admin / VP switches it on for that employee.
+    @Column(name = "advance_enabled", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    @Builder.Default
+    private Boolean advanceEnabled = false;
+
     // ── Employee exit ("marked exited from Happizo") ──────────────────────
     // The employee can no longer log in (active=false) but every record they
     // created stays in the system. These fields capture the exit for HR.

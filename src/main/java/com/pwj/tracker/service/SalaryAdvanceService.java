@@ -34,6 +34,8 @@ public class SalaryAdvanceService {
     public SalaryAdvance raise(String username, BigDecimal amount, String reason, Integer termMonths) {
         AppUser user = userRepo.findByUsernameAndActiveTrue(username == null ? "" : username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!Boolean.TRUE.equals(user.getAdvanceEnabled()))
+            throw new RuntimeException("Salary advance isn't enabled for you — ask Admin or VP to enable it");
         if (amount == null || amount.signum() <= 0) throw new RuntimeException("Enter the advance amount");
         int term = termMonths == null ? 0 : termMonths;
         if (term < 1 || term > MAX_TERM_MONTHS) throw new RuntimeException("Repayment term must be 1 to " + MAX_TERM_MONTHS + " months");
@@ -211,6 +213,43 @@ public class SalaryAdvanceService {
     }
 
     // ── Reads ────────────────────────────────────────────────────────────
+
+    /** Whether Admin / VP has switched salary advance on for this person. */
+    public boolean isEnabled(String username) {
+        return userRepo.findByUsernameAndActiveTrue(username == null ? "" : username)
+                .map(u -> Boolean.TRUE.equals(u.getAdvanceEnabled())).orElse(false);
+    }
+
+    /** Admin / VP: every current employee with their advance switch. */
+    public List<Map<String, Object>> eligibility(String actorUsername) {
+        requireAdminOrVp(actorUsername);
+        return userRepo.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getActive()) && !Boolean.TRUE.equals(u.getExited()))
+                .sorted(Comparator.comparing(u -> u.getFullName() == null ? "" : u.getFullName().toLowerCase()))
+                .map(u -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("username", u.getUsername()); m.put("fullName", u.getFullName());
+                    m.put("role", u.getRole() != null ? u.getRole().name() : null);
+                    m.put("designation", u.getDesignation());
+                    m.put("enabled", Boolean.TRUE.equals(u.getAdvanceEnabled()));
+                    return m;
+                }).toList();
+    }
+
+    @Transactional
+    public void setEnabled(String actorUsername, String targetUsername, boolean enabled) {
+        requireAdminOrVp(actorUsername);
+        AppUser target = userRepo.findByUsernameAndActiveTrue(targetUsername == null ? "" : targetUsername)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        target.setAdvanceEnabled(enabled);
+        userRepo.save(target);
+    }
+
+    private void requireAdminOrVp(String username) {
+        AppUser a = actor(username);
+        if (a.getRole() != AppUser.Role.ADMIN && a.getRole() != AppUser.Role.VP)
+            throw new RuntimeException("Only Admin or VP can enable salary advance");
+    }
 
     public List<Map<String, Object>> mine(String username) {
         return enrich(repo.findByUsernameOrderByCreatedAtDesc(username));
