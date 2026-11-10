@@ -24,7 +24,10 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class PaymentRequestService {
 
-    private static final Set<String> TYPES = Set.of("PO", "WO");
+    private static final Set<String> TYPES = Set.of("PO", "WO", "JO");
+    /** Site engineers may request payment only on these document types; procurement engineers on all of them. */
+    private static final Set<AppUser.Role> ALL_TYPES_ROLES = EnumSet.of(AppUser.Role.PROCUREMENT_ENGINEER, AppUser.Role.PROCUREMENT, AppUser.Role.ADMIN);
+    private static final Set<String> ENGINEER_TYPES = Set.of("WO", "JO");
     private static final Set<AppUser.Role> OVERSIGHT = EnumSet.of(AppUser.Role.ADMIN, AppUser.Role.VP, AppUser.Role.OH, AppUser.Role.CEO);
 
     private final PaymentRequestRepository repo;
@@ -40,13 +43,16 @@ public class PaymentRequestService {
         if (amount == null || amount.signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero");
         PwjEntryResponse entry = pwjEntryService.getById(pwjEntryId);
         if (entry.getPwjType() == null || !TYPES.contains(entry.getPwjType().toUpperCase()))
-            throw new IllegalArgumentException("Payment can be requested only for PO and WO documents");
+            throw new IllegalArgumentException("Payment can be requested only for PO, WO and JO documents");
+        if (!ALL_TYPES_ROLES.contains(actor.getRole()) && !ENGINEER_TYPES.contains(entry.getPwjType().toUpperCase()))
+            throw new IllegalArgumentException("Site engineers can request payment only for WO and JO documents");
         boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
                 || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
         if (!issued) throw new IllegalArgumentException("PR #" + pwjEntryId + " has not been issued yet");
-        if (!same(entry.getRaisedBy(), actor))
-            throw new IllegalArgumentException("Only the engineer who raised this PR can request payment for it");
-        if (entry.getAllocatedTo() == null || entry.getAllocatedTo().isBlank())
+        if (!same(entry.getRaisedBy(), actor) && !ALL_TYPES_ROLES.contains(actor.getRole()))
+            throw new IllegalArgumentException("Only the engineer who raised this PR (or a procurement engineer) can request payment for it");
+        boolean direct = ALL_TYPES_ROLES.contains(actor.getRole()); // procurement side needs no approval
+        if (!direct && (entry.getAllocatedTo() == null || entry.getAllocatedTo().isBlank()))
             throw new IllegalArgumentException("This PR isn't allocated to a procurement person yet — they approve payment requests");
 
         String doc = blankToNull(docNumber);
@@ -65,6 +71,14 @@ public class PaymentRequestService {
                 .pwjEntryId(pwjEntryId).docNumber(doc).amount(amount)
                 .remarks(blankToNull(remarks)).paymentMadeAgainst(blankToNull(paymentMadeAgainst)).paymentStage(blankToNull(paymentStage))
                 .requestedBy(actor.getUsername()).requestedByName(actor.getFullName()).status("PENDING").build());
+        if (direct) {
+            // Procurement / Procurement Engineer / Admin: goes straight to Send for Payment, no approval step.
+            ExpenseItemDto item = expenseItemService.sendPwjEntryForPayment(pwjEntryId, amount, r.getRemarks(),
+                    r.getPaymentMadeAgainst(), r.getPaymentStage(), doc);
+            r.setStatus("APPROVED");
+            r.setDecidedBy(actor.getFullName()); r.setDecidedAt(LocalDateTime.now()); r.setExpenseItemId(item.getId());
+            r = repo.save(r);
+        }
         return view(r, entry, actor, new HashMap<>());
     }
 
