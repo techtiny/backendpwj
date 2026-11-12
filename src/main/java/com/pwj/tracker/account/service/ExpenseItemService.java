@@ -234,6 +234,13 @@ public class ExpenseItemService {
         return sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage, null);
     }
 
+    /** True when the given sub-document (e.g. one vendor's WO of a multi-vendor entry) is VP-approved on its own. */
+    public boolean isSubDocApproved(String docNumber) {
+        if (docNumber == null || docNumber.isBlank()) return false;
+        return pwjEntryService.getDocSummaries().stream()
+                .anyMatch(d -> docNumber.trim().equals(d.get("docNumber")) && "VP_APPROVED".equals(d.get("docStatus")));
+    }
+
     /**
      * @param docNumber optional — targets one specific sub-doc of a multi-vendor/multi-PO
      *                  entry (e.g. an Additional PO like "WO-2627-0004A") instead of the
@@ -247,13 +254,14 @@ public class ExpenseItemService {
             throw new IllegalArgumentException("Amount must be greater than zero");
         }
         PwjEntryResponse entry = pwjEntryService.getById(pwjEntryId);
-        // Payment is requested against Purchase Orders only — not Work Orders or Job Orders.
-        if (!"PO".equalsIgnoreCase(entry.getPwjType())) {
-            throw new IllegalArgumentException("Payment can be requested only for a PO document — #" + pwjEntryId + " is a "
+        // Payment can be requested against issued PO, WO and JO documents.
+        if (entry.getPwjType() == null || !java.util.Set.of("PO", "WO", "JO").contains(entry.getPwjType().toUpperCase())) {
+            throw new IllegalArgumentException("Payment can be requested only for PO, WO or JO documents — #" + pwjEntryId + " is a "
                     + (entry.getPwjType() == null || entry.getPwjType().isBlank() ? "non-PO" : entry.getPwjType()) + " document");
         }
         boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
-                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
+                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()))
+                || isSubDocApproved(docNumber);
         if (!issued) {
             throw new IllegalArgumentException("PWJ entry #" + pwjEntryId + " has not been issued yet");
         }
@@ -357,7 +365,8 @@ public class ExpenseItemService {
         out.put("resolved", false);
 
         boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
-                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
+                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()))
+                || isSubDocApproved(docNumber);
         if (!issued
                 || targetDocNumber == null || targetDocNumber.isBlank()
                 || entry.getProjectName() == null || entry.getProjectName().isBlank()) {

@@ -47,7 +47,8 @@ public class PaymentRequestService {
         if (!ALL_TYPES_ROLES.contains(actor.getRole()) && !ENGINEER_TYPES.contains(entry.getPwjType().toUpperCase()))
             throw new IllegalArgumentException("Site engineers can request payment only for WO and JO documents");
         boolean issued = Boolean.TRUE.equals(entry.getPwjIssued())
-                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()));
+                || (entry.getDocStatus() != null && "VP_APPROVED".equals(entry.getDocStatus().name()))
+                || expenseItemService.isSubDocApproved(docNumber);
         if (!issued) throw new IllegalArgumentException("PR #" + pwjEntryId + " has not been issued yet");
         if (!same(entry.getRaisedBy(), actor) && !ALL_TYPES_ROLES.contains(actor.getRole()))
             throw new IllegalArgumentException("Only the engineer who raised this PR (or a procurement engineer) can request payment for it");
