@@ -42,6 +42,13 @@ public class AttendanceService {
             throw new RuntimeException("Already checked in today");
         }
 
+        // A past day checked in but never checked out must be checked out first (see checkOutPreviousDays).
+        // Not applied to VP / CEO / OH.
+        if (AppUser.CHECKIN_ROLES.contains(user.getRole())) {
+            pendingPreviousCheckouts(username).stream().findFirst().ifPresent(x -> {
+                throw new RuntimeException("PREVIOUS_CHECKOUT_PENDING:" + x.getWorkDate()); });
+        }
+
         Attendance att = existing.orElse(Attendance.builder()
                 .username(username)
                 .fullName(user.getFullName())
@@ -55,6 +62,40 @@ public class AttendanceService {
         att.setCheckInAddress(address);
         att.setStatus("PRESENT");
         return attendanceRepository.save(att);
+    }
+
+    /** Past days this person checked in but never checked out, oldest first. */
+    public List<Attendance> pendingPreviousCheckouts(String username) {
+        return attendanceRepository.findIncompleteBeforeDate(LocalDate.now(IST)).stream()
+                .filter(x -> username.equalsIgnoreCase(x.getUsername()) && x.getCheckInTime() != null)
+                .sorted(java.util.Comparator.comparing(Attendance::getWorkDate))
+                .toList();
+    }
+
+    /** Same as pendingPreviousCheckouts, but empty for roles that don't check in (VP / CEO / OH). */
+    public List<Attendance> pendingForGate(String username) {
+        return userRepository.findByUsernameAndActiveTrue(username)
+                .filter(u -> AppUser.CHECKIN_ROLES.contains(u.getRole()))
+                .map(u -> pendingPreviousCheckouts(username))
+                .orElse(List.of());
+    }
+
+    /** The employee checks out for the earlier day(s) they left open: recorded at 23:59 of that day (the day's cut-off). */
+    @Transactional
+    public List<Attendance> checkOutPreviousDays(String username) {
+        List<Attendance> pending = pendingPreviousCheckouts(username);
+        for (Attendance x : pending) {
+            LocalDateTime end = x.getWorkDate().atTime(23, 59);
+            if (end.isBefore(x.getCheckInTime())) end = x.getCheckInTime();
+            x.setCheckOutTime(end);
+            long minutes = java.time.Duration.between(x.getCheckInTime(), end).toMinutes();
+            x.setTotalMinutes((int) minutes);
+            x.setStatus(minutes >= 240 ? "PRESENT" : "HALF_DAY");
+            String note = "Checked out the next day (no check-out by 23:59)";
+            x.setNotes(x.getNotes() == null || x.getNotes().isBlank() ? note : x.getNotes() + " · " + note);
+            attendanceRepository.save(x);
+        }
+        return pending;
     }
 
     @Transactional

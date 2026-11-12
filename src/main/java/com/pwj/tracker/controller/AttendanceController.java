@@ -38,6 +38,18 @@ public class AttendanceController {
         return ResponseEntity.ok(ApiResponse.ok("Checked out successfully", service.checkOut(username, lat, lng, addr)));
     }
 
+    /** POST /api/v1/hr/attendance/checkout-previous — closes the earlier day(s) left without a check-out */
+    @PostMapping("/checkout-previous")
+    public ResponseEntity<ApiResponse<List<Attendance>>> checkOutPrevious(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.ok("Checked out for the previous day", service.checkOutPreviousDays((String) body.get("username"))));
+    }
+
+    /** GET /api/v1/hr/attendance/pending-checkout/{username} — earlier days left without a check-out (empty for VP/CEO/OH) */
+    @GetMapping("/pending-checkout/{username}")
+    public ResponseEntity<ApiResponse<List<Attendance>>> pendingCheckout(@PathVariable String username) {
+        return ResponseEntity.ok(ApiResponse.ok("Pending check-outs", service.pendingForGate(username)));
+    }
+
     /** GET /api/v1/hr/attendance/today/{username} */
     @GetMapping("/today/{username}")
     public ResponseEntity<ApiResponse<Attendance>> getToday(@PathVariable String username) {
