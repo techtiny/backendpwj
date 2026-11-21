@@ -160,6 +160,18 @@ public class ExpenseItemController {
         return ResponseEntity.ok(service.setVpApproval(id, body.get("status"), body.get("remark")));
     }
 
+    /** PATCH /api/expenses/{id}/admin-reschedule — Body: { "date": "yyyy-MM-dd", "remark": "..." }. Admin moves the payment to the next cycle instead of rejecting. */
+    @PatchMapping("/{id}/admin-reschedule")
+    public ResponseEntity<ExpenseItemDto> rescheduleAtAdmin(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(service.rescheduleAtAdmin(id, body.get("date"), body.get("remark")));
+    }
+
+    /** PATCH /api/expenses/{id}/vp-reschedule — Body: { "date": "yyyy-MM-dd", "remark": "..." }. VP moves the payment to the next cycle instead of rejecting. */
+    @PatchMapping("/{id}/vp-reschedule")
+    public ResponseEntity<ExpenseItemDto> rescheduleAtVp(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(service.rescheduleAtVp(id, body.get("date"), body.get("remark")));
+    }
+
     /** PATCH /api/expenses/{id}/ceo-approval — Body: { "status": "APPROVED"|"REJECTED", "remark": "..." }. Requires VP approved. */
     @PatchMapping("/{id}/ceo-approval")
     public ResponseEntity<ExpenseItemDto> setCeoApproval(
@@ -169,8 +181,14 @@ public class ExpenseItemController {
 
     /** PATCH /api/expenses/{id}/vp-revise — VP sends an Admin-approved entry back to Admin for revision. */
     @PatchMapping("/{id}/vp-revise")
-    public ResponseEntity<ExpenseItemDto> reviseAtVp(@PathVariable Long id) {
-        return ResponseEntity.ok(service.reviseAtVp(id));
+    public ResponseEntity<ExpenseItemDto> reviseAtVp(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
+        return ResponseEntity.ok(service.reviseAtVp(id, body == null ? null : body.get("date")));
+    }
+
+    /** PATCH /api/expenses/{id}/required-date — Body: { "date": "yyyy-MM-dd" }. Admin / VP choose the Required By date. */
+    @PatchMapping("/{id}/required-date")
+    public ResponseEntity<ExpenseItemDto> setRequiredDate(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(service.setRequiredDate(id, body.get("date")));
     }
 
     /**
@@ -187,7 +205,10 @@ public class ExpenseItemController {
                 ? new BigDecimal(String.valueOf(body.get("deductionAmount"))) : null;
         Boolean gstDeducted = body.get("gstDeducted") != null
                 ? Boolean.valueOf(String.valueOf(body.get("gstDeducted"))) : null;
-        return ResponseEntity.ok(service.setDeductions(id, tdsPercent, deductionAmount, gstDeducted));
+        BigDecimal tdsAmount = body.get("tdsAmount") != null && !String.valueOf(body.get("tdsAmount")).isBlank()
+                ? new BigDecimal(String.valueOf(body.get("tdsAmount"))) : null;
+        String deductionRemarks = body.get("deductionRemarks") != null ? String.valueOf(body.get("deductionRemarks")) : null;
+        return ResponseEntity.ok(service.setDeductions(id, tdsPercent, deductionAmount, gstDeducted, tdsAmount, deductionRemarks));
     }
 
     /**

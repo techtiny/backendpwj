@@ -164,7 +164,7 @@ public class FundMovementService {
             if (!"APPROVED".equals(ExpenseItemService.effectiveCeoStatus(e))) continue;
             // An entry rejected at any level never counts towards today's bank-transfer demand.
             if ("REJECTED".equalsIgnoreCase(e.getOhApprovalStatus()) || "REJECTED".equalsIgnoreCase(e.getAdminApprovalStatus())) continue;
-            if (e.getSentAt() == null || !e.getSentAt().toLocalDate().equals(today)) continue;
+            if (!today.equals(ExpenseItemService.bankFileDay(e))) continue; // sent today, unless its Required By pushes it to a later cycle
             if (e.getProjectId() == null) continue;
             BigDecimal pay = e.getApprovedValue() != null ? e.getApprovedValue() : safe(e.getSentAmount());
             demand.merge(e.getProjectId(), pay, BigDecimal::add);

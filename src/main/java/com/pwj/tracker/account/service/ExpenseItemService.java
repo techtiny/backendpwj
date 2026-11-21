@@ -551,7 +551,29 @@ public class ExpenseItemService {
             throw new IllegalArgumentException("Entry #" + id + " must be OH-approved before Admin approval");
         }
         applyDecisionRemark(e, "ADMIN", status, remark);
+        if ("APPROVED".equals(status) && "ADMIN_RESCHEDULE".equals(e.getRejectedAtLevel())) { e.setRejectionRemark(null); e.setRejectedAtLevel(null); }
         e.setAdminApprovalStatus(status);
+        e.setVpApprovalStatus("PENDING");
+        e.setCeoApprovalStatus("PENDING");
+        return toDto(repo.save(e));
+    }
+
+    /** Level 2 (Admin) moves the payment to the next cycle instead of rejecting: new required-by date + remark; Admin/VP/CEO back to PENDING. */
+    public ExpenseItemDto rescheduleAtAdmin(Long id, String newDate, String remark) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        if (!"APPROVED".equals(normalizeApproval(e.getOhApprovalStatus()))) {
+            throw new IllegalArgumentException("Entry #" + id + " must be OH-approved before Admin can reschedule it");
+        }
+        java.time.LocalDate d;
+        try { d = java.time.LocalDate.parse(newDate == null ? "" : newDate.trim()); }
+        catch (Exception ex) { throw new IllegalArgumentException("Pick the new payment date (next cycle)"); }
+        if (!d.isAfter(java.time.LocalDate.now())) throw new IllegalArgumentException("The new date must be in the future");
+        if (remark == null || remark.isBlank()) throw new IllegalArgumentException("Enter a reason for rescheduling");
+        e.setRequiredByDate(d);
+        e.setRejectionRemark(remark.trim());
+        e.setRejectedAtLevel("ADMIN_RESCHEDULE");
+        e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
         e.setCeoApprovalStatus("PENDING");
         return toDto(repo.save(e));
@@ -572,9 +594,49 @@ public class ExpenseItemService {
             throw new IllegalArgumentException("Entry #" + id + " must be Admin-approved before VP approval");
         }
         applyDecisionRemark(e, "VP", status, remark);
+        if ("APPROVED".equals(status) && "VP_RESCHEDULE".equals(e.getRejectedAtLevel())) { e.setRejectionRemark(null); e.setRejectedAtLevel(null); }
         e.setVpApprovalStatus(status);
         e.setCeoApprovalStatus("PENDING");
         return toDto(repo.save(e));
+    }
+
+    /**
+     * Level 3 (VP) does not reject outright: the payment is moved to the next cycle. The new "required by" date is
+     * recorded with the VP's remark, Admin's approval stays, and VP/CEO go back to PENDING — so it stays out of the
+     * current cycle's bank file (not CEO-approved) and comes back to the VP for the new cycle.
+     */
+    public ExpenseItemDto rescheduleAtVp(Long id, String newDate, String remark) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        if (!"APPROVED".equals(normalizeApproval(e.getAdminApprovalStatus()))) {
+            throw new IllegalArgumentException("Entry #" + id + " must be Admin-approved before VP can reschedule it");
+        }
+        java.time.LocalDate d;
+        try { d = java.time.LocalDate.parse(newDate == null ? "" : newDate.trim()); }
+        catch (Exception ex) { throw new IllegalArgumentException("Pick the new payment date (next cycle)"); }
+        if (!d.isAfter(java.time.LocalDate.now())) throw new IllegalArgumentException("The new date must be in the future");
+        if (remark == null || remark.isBlank()) throw new IllegalArgumentException("Enter a reason for rescheduling");
+        e.setRequiredByDate(d);
+        e.setRejectionRemark(remark.trim());
+        e.setRejectedAtLevel("VP_RESCHEDULE");
+        e.setVpApprovalStatus("PENDING");
+        e.setCeoApprovalStatus("PENDING");
+        return toDto(repo.save(e));
+    }
+
+    /** How many days before its Required By date a payment goes into a bank file. A later-dated payment waits for its own cycle. */
+    public static final int BANK_CYCLE_DAYS = 7;
+
+    /**
+     * The day this entry belongs in a bank file: the day it was sent, unless its Required By date is more than
+     * BANK_CYCLE_DAYS after that — then it is pushed to (Required By − BANK_CYCLE_DAYS), i.e. the cycle before it is due.
+     */
+    public static java.time.LocalDate bankFileDay(ExpenseItem e) {
+        if (e.getSentAt() == null) return null;
+        java.time.LocalDate sent = e.getSentAt().toLocalDate();
+        java.time.LocalDate req = e.getRequiredByDate();
+        if (req != null && req.minusDays(BANK_CYCLE_DAYS).isAfter(sent)) return req.minusDays(BANK_CYCLE_DAYS);
+        return sent;
     }
 
     /** Level 4 (CEO) status. Entries sent before Level 4 existed have no CEO status: once VP-approved they count as CEO-approved. */
@@ -599,12 +661,38 @@ public class ExpenseItemService {
     }
 
     /** VP sends an Admin-approved entry back to Admin for revision (e.g. to adjust TDS/Deduction). */
-    public ExpenseItemDto reviseAtVp(Long id) {
+    public ExpenseItemDto reviseAtVp(Long id) { return reviseAtVp(id, null); }
+
+    /** Sets just the "required by" date of a sent entry (Admin / VP pick it; must be today or later). */
+    public ExpenseItemDto setRequiredDate(Long id, String date) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        e.setRequiredByDate(parseFutureDate(date));
+        return toDto(repo.save(e));
+    }
+
+    private static java.time.LocalDate parseFutureDate(String date) {
+        java.time.LocalDate d;
+        try { d = java.time.LocalDate.parse(date == null ? "" : date.trim()); }
+        catch (Exception ex) { throw new IllegalArgumentException("Pick a valid Required By date"); }
+        if (d.isBefore(java.time.LocalDate.now())) throw new IllegalArgumentException("Required By date cannot be in the past");
+        return d;
+    }
+
+    /** VP revises an Admin-approved entry: with a new Required By date it is revised and VP-approved in one step (earlier approvals kept); without one it goes back to Admin. */
+    public ExpenseItemDto reviseAtVp(Long id, String newRequiredDate) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (!"APPROVED".equals(normalizeApproval(e.getAdminApprovalStatus()))) {
-            throw new IllegalArgumentException("Entry #" + id + " must be Admin-approved before it can be sent back for revision");
+            throw new IllegalArgumentException("Entry #" + id + " must be Admin-approved before VP can revise it");
         }
+        if (newRequiredDate != null && !newRequiredDate.isBlank()) {
+            // Revise = set the new Required By date and approve at the VP level in one go; earlier approvals (OH, Admin) stay.
+            e.setRequiredByDate(parseFutureDate(newRequiredDate));
+            repo.save(e);
+            return setVpApproval(id, "APPROVED", null);
+        }
+        // No date given — legacy behaviour: send back to Admin (e.g. to adjust TDS/Deduction).
         e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
         e.setCeoApprovalStatus("PENDING");
@@ -619,6 +707,15 @@ public class ExpenseItemService {
      * PENDING.
      */
     public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, BigDecimal deductionAmount, Boolean gstDeducted) {
+        return setDeductions(id, tdsPercent, deductionAmount, gstDeducted, null, null);
+    }
+
+    public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, BigDecimal deductionAmount, Boolean gstDeducted, BigDecimal tdsAmountOverride) {
+        return setDeductions(id, tdsPercent, deductionAmount, gstDeducted, tdsAmountOverride, null);
+    }
+
+    /** As above, optionally with a manually typed TDS Amt that overrides the one computed from the TDS %. */
+    public ExpenseItemDto setDeductions(Long id, BigDecimal tdsPercent, BigDecimal deductionAmount, Boolean gstDeducted, BigDecimal tdsAmountOverride, String deductionRemarks) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (tdsPercent != null && tdsPercent.signum() < 0) {
@@ -630,7 +727,14 @@ public class ExpenseItemService {
         e.setTdsPercent(tdsPercent != null && tdsPercent.signum() == 0 ? null : tdsPercent);
         e.setDeductionAmount(deductionAmount != null && deductionAmount.signum() == 0 ? null : deductionAmount);
         if (gstDeducted != null) e.setGstDeducted(gstDeducted);
+        if (deductionRemarks != null) e.setDeductionRemarks(deductionRemarks.isBlank() ? null : (deductionRemarks.length() > 1000 ? deductionRemarks.substring(0, 1000) : deductionRemarks));
         recomputeDeductions(e);
+        if (tdsAmountOverride != null) {
+            if (tdsAmountOverride.signum() < 0) throw new IllegalArgumentException("TDS Amt cannot be negative");
+            BigDecimal gstAmt = Boolean.TRUE.equals(e.getGstDeducted()) ? safe(e.getPwjGstAmount()) : BigDecimal.ZERO;
+            e.setTdsAmount(tdsAmountOverride);
+            e.setApprovedValue(safe(e.getSentAmount()).subtract(tdsAmountOverride).subtract(gstAmt).subtract(safe(e.getDeductionAmount())));
+        }
         e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
         e.setCeoApprovalStatus("PENDING");
@@ -766,6 +870,7 @@ public class ExpenseItemService {
         d.setRequiredByDate(e.getRequiredByDate());
         d.setRejectionRemark(e.getRejectionRemark());
         d.setRejectedAtLevel(e.getRejectedAtLevel());
+        d.setDeductionRemarks(e.getDeductionRemarks());
         d.setOhApprovalStatus(normalizeApproval(e.getOhApprovalStatus()));
         d.setAdminApprovalStatus(normalizeApproval(e.getAdminApprovalStatus()));
         d.setVpApprovalStatus(normalizeApproval(e.getVpApprovalStatus()));

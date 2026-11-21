@@ -87,6 +87,9 @@ public class ExpenseItem {
     private String rejectionRemark;
     @Column(name = "rejected_at_level", length = 10)
     private String rejectedAtLevel;
+    // Why a manual deduction was added (Admin) — one line per addition.
+    @Column(name = "deduction_remarks", length = 1000)
+    private String deductionRemarks;
 
     // Three-stage approval on the sent amount, independent of the Send-for-Payment
     // workflow itself — OH reviews first (and may revise sentAmount), then Admin, then VP.
@@ -216,6 +219,8 @@ public class ExpenseItem {
     public void setSentAmount(BigDecimal sentAmount) { this.sentAmount = sentAmount; }
     public String getRejectionRemark() { return rejectionRemark; }
     public void setRejectionRemark(String rejectionRemark) { this.rejectionRemark = rejectionRemark; }
+    public String getDeductionRemarks() { return deductionRemarks; }
+    public void setDeductionRemarks(String deductionRemarks) { this.deductionRemarks = deductionRemarks; }
     public String getRejectedAtLevel() { return rejectedAtLevel; }
     public void setRejectedAtLevel(String rejectedAtLevel) { this.rejectedAtLevel = rejectedAtLevel; }
     public java.time.LocalDate getRequiredByDate() { return requiredByDate; }

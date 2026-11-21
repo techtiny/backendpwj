@@ -37,6 +37,7 @@ public class ExpenseItemDto {
     private java.time.LocalDate requiredByDate;
     private String rejectionRemark;
     private String rejectedAtLevel;
+    private String deductionRemarks;
     private String ohApprovalStatus;
     private String adminApprovalStatus;
     private String vpApprovalStatus;
@@ -130,6 +131,8 @@ public class ExpenseItemDto {
     public void setSentAmount(BigDecimal sentAmount) { this.sentAmount = sentAmount; }
     public String getRejectionRemark() { return rejectionRemark; }
     public void setRejectionRemark(String rejectionRemark) { this.rejectionRemark = rejectionRemark; }
+    public String getDeductionRemarks() { return deductionRemarks; }
+    public void setDeductionRemarks(String deductionRemarks) { this.deductionRemarks = deductionRemarks; }
     public String getRejectedAtLevel() { return rejectedAtLevel; }
     public void setRejectedAtLevel(String rejectedAtLevel) { this.rejectedAtLevel = rejectedAtLevel; }
     public java.time.LocalDate getRequiredByDate() { return requiredByDate; }
