@@ -38,7 +38,7 @@ public class PaymentRequestService {
     /** The engineer raises a payment request — validated like a direct send, but it only goes to procurement. */
     @Transactional
     public Map<String, Object> raise(String username, Long pwjEntryId, BigDecimal amount, String remarks,
-                                     String paymentMadeAgainst, String paymentStage, String docNumber) {
+                                     String paymentMadeAgainst, String paymentStage, String docNumber, String requiredBy, String itemDescription) {
         AppUser actor = actor(username);
         if (amount == null || amount.signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero");
         PwjEntryResponse entry = pwjEntryService.getById(pwjEntryId);
@@ -71,11 +71,13 @@ public class PaymentRequestService {
         PaymentRequest r = repo.save(PaymentRequest.builder()
                 .pwjEntryId(pwjEntryId).docNumber(doc).amount(amount)
                 .remarks(blankToNull(remarks)).paymentMadeAgainst(blankToNull(paymentMadeAgainst)).paymentStage(blankToNull(paymentStage))
+                .requiredByDate(parseDate(requiredBy))
+                .itemDescription(blankToNull(itemDescription))
                 .requestedBy(actor.getUsername()).requestedByName(actor.getFullName()).status("PENDING").build());
         if (direct) {
             // Procurement / Procurement Engineer / Admin: goes straight to Send for Payment, no approval step.
             ExpenseItemDto item = expenseItemService.sendPwjEntryForPayment(pwjEntryId, amount, r.getRemarks(),
-                    r.getPaymentMadeAgainst(), r.getPaymentStage(), doc);
+                    r.getPaymentMadeAgainst(), r.getPaymentStage(), doc, r.getRequiredByDate(), r.getItemDescription());
             r.setStatus("APPROVED");
             r.setDecidedBy(actor.getFullName()); r.setDecidedAt(LocalDateTime.now()); r.setExpenseItemId(item.getId());
             r = repo.save(r);
@@ -93,7 +95,7 @@ public class PaymentRequestService {
         if (!"PENDING".equals(r.getStatus())) throw new IllegalArgumentException("This request was already " + r.getStatus().toLowerCase());
         // All the real checks (issued, PO-value cap, one open request per document) run here; any failure keeps it PENDING.
         ExpenseItemDto item = expenseItemService.sendPwjEntryForPayment(r.getPwjEntryId(), r.getAmount(), r.getRemarks(),
-                r.getPaymentMadeAgainst(), r.getPaymentStage(), r.getDocNumber());
+                r.getPaymentMadeAgainst(), r.getPaymentStage(), r.getDocNumber(), r.getRequiredByDate(), r.getItemDescription());
         r.setStatus("APPROVED");
         r.setDecidedBy(actor.getFullName()); r.setDecidedAt(LocalDateTime.now()); r.setExpenseItemId(item.getId());
         return view(repo.save(r), entry, actor, new HashMap<>());
@@ -148,7 +150,7 @@ public class PaymentRequestService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", r.getId()); m.put("pwjEntryId", r.getPwjEntryId()); m.put("docNumber", r.getDocNumber());
         m.put("amount", r.getAmount()); m.put("remarks", r.getRemarks());
-        m.put("paymentMadeAgainst", r.getPaymentMadeAgainst()); m.put("paymentStage", r.getPaymentStage());
+        m.put("requiredByDate", r.getRequiredByDate()); m.put("itemDescription", r.getItemDescription()); m.put("paymentMadeAgainst", r.getPaymentMadeAgainst()); m.put("paymentStage", r.getPaymentStage());
         m.put("requestedBy", r.getRequestedBy()); m.put("requestedByName", r.getRequestedByName()); m.put("requestedAt", r.getRequestedAt());
         m.put("status", r.getStatus());
         m.put("decidedBy", r.getDecidedBy()); m.put("decidedAt", r.getDecidedAt()); m.put("decisionRemark", r.getDecisionRemark());
@@ -163,6 +165,12 @@ public class PaymentRequestService {
     private void requireAllocated(PwjEntryResponse entry, AppUser actor) {
         if (!same(entry.getAllocatedTo(), actor))
             throw new IllegalArgumentException("Only the procurement person this PR is allocated to can decide this request");
+    }
+
+    private static java.time.LocalDate parseDate(String s) {
+        if (s == null || s.isBlank()) return null;
+        try { return java.time.LocalDate.parse(s.trim()); }
+        catch (java.time.format.DateTimeParseException e) { throw new IllegalArgumentException("Required-by date must be a valid date"); }
     }
 
     private static boolean same(String name, AppUser u) {

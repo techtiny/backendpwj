@@ -78,6 +78,16 @@ public class ExpenseItem {
     // "Send for Payment" tracker's timeline filter, separate from paymentDate.
     private java.time.LocalDateTime sentAt;
 
+    // Optional: the date the requesting engineer needs this payment made by (from the payment request).
+    @Column(name = "required_by_date")
+    private java.time.LocalDate requiredByDate;
+
+    // Why this entry was rejected, and at which approval level (OH / ADMIN / VP) — required when rejecting.
+    @Column(name = "rejection_remark", length = 500)
+    private String rejectionRemark;
+    @Column(name = "rejected_at_level", length = 10)
+    private String rejectedAtLevel;
+
     // Three-stage approval on the sent amount, independent of the Send-for-Payment
     // workflow itself — OH reviews first (and may revise sentAmount), then Admin, then VP.
     @Column(nullable = false)
@@ -88,6 +98,10 @@ public class ExpenseItem {
 
     @Column(nullable = false)
     private String vpApprovalStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+
+    // Level 4 — CEO, after VP. Null only on entries sent before Level 4 existed (treated as approved once VP-approved).
+    @Column(name = "ceo_approval_status", length = 12)
+    private String ceoApprovalStatus;
 
     // Which payment stage this is — chosen in the Send for Payment dialog.
     // ADVANCE, STAGE_1, STAGE_2, STAGE_3, FINAL
@@ -200,12 +214,20 @@ public class ExpenseItem {
     public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
     public BigDecimal getSentAmount() { return sentAmount; }
     public void setSentAmount(BigDecimal sentAmount) { this.sentAmount = sentAmount; }
+    public String getRejectionRemark() { return rejectionRemark; }
+    public void setRejectionRemark(String rejectionRemark) { this.rejectionRemark = rejectionRemark; }
+    public String getRejectedAtLevel() { return rejectedAtLevel; }
+    public void setRejectedAtLevel(String rejectedAtLevel) { this.rejectedAtLevel = rejectedAtLevel; }
+    public java.time.LocalDate getRequiredByDate() { return requiredByDate; }
+    public void setRequiredByDate(java.time.LocalDate requiredByDate) { this.requiredByDate = requiredByDate; }
     public java.time.LocalDateTime getSentAt() { return sentAt; }
     public void setSentAt(java.time.LocalDateTime sentAt) { this.sentAt = sentAt; }
     public String getOhApprovalStatus() { return ohApprovalStatus; }
     public void setOhApprovalStatus(String ohApprovalStatus) { this.ohApprovalStatus = ohApprovalStatus; }
     public String getAdminApprovalStatus() { return adminApprovalStatus; }
     public void setAdminApprovalStatus(String adminApprovalStatus) { this.adminApprovalStatus = adminApprovalStatus; }
+    public String getCeoApprovalStatus() { return ceoApprovalStatus; }
+    public void setCeoApprovalStatus(String ceoApprovalStatus) { this.ceoApprovalStatus = ceoApprovalStatus; }
     public String getVpApprovalStatus() { return vpApprovalStatus; }
     public void setVpApprovalStatus(String vpApprovalStatus) { this.vpApprovalStatus = vpApprovalStatus; }
     public BigDecimal getTdsPercent() { return tdsPercent; }

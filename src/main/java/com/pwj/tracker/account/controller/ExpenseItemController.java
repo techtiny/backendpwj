@@ -143,21 +143,28 @@ public class ExpenseItemController {
         String status = (String) body.get("status");
         BigDecimal revisedAmount = body.get("revisedAmount") != null
                 ? new BigDecimal(body.get("revisedAmount").toString()) : null;
-        return ResponseEntity.ok(service.setOhApproval(id, status, revisedAmount));
+        return ResponseEntity.ok(service.setOhApproval(id, status, revisedAmount, body.get("remark") == null ? null : body.get("remark").toString()));
     }
 
     /** PATCH /api/expenses/{id}/admin-approval — Body: { "status": "APPROVED"|"REJECTED" }. Requires OH approved. */
     @PatchMapping("/{id}/admin-approval")
     public ResponseEntity<ExpenseItemDto> setAdminApproval(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(service.setAdminApproval(id, body.get("status")));
+        return ResponseEntity.ok(service.setAdminApproval(id, body.get("status"), body.get("remark")));
     }
 
     /** PATCH /api/expenses/{id}/vp-approval — Body: { "status": "APPROVED"|"REJECTED" }. Requires Admin approved. */
     @PatchMapping("/{id}/vp-approval")
     public ResponseEntity<ExpenseItemDto> setVpApproval(
             @PathVariable Long id, @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(service.setVpApproval(id, body.get("status")));
+        return ResponseEntity.ok(service.setVpApproval(id, body.get("status"), body.get("remark")));
+    }
+
+    /** PATCH /api/expenses/{id}/ceo-approval — Body: { "status": "APPROVED"|"REJECTED", "remark": "..." }. Requires VP approved. */
+    @PatchMapping("/{id}/ceo-approval")
+    public ResponseEntity<ExpenseItemDto> setCeoApproval(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(service.setCeoApproval(id, body.get("status"), body.get("remark")));
     }
 
     /** PATCH /api/expenses/{id}/vp-revise — VP sends an Admin-approved entry back to Admin for revision. */

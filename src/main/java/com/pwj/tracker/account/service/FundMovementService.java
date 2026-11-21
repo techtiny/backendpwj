@@ -160,6 +160,10 @@ public class FundMovementService {
         for (ExpenseItem e : expenseRepo.findSentForPayment()) {
             String vp = e.getVpApprovalStatus() == null ? "" : e.getVpApprovalStatus().trim().toUpperCase();
             if (!"APPROVED".equals(vp)) continue;
+            // Level 4: only CEO-approved entries are part of the bank transfer.
+            if (!"APPROVED".equals(ExpenseItemService.effectiveCeoStatus(e))) continue;
+            // An entry rejected at any level never counts towards today's bank-transfer demand.
+            if ("REJECTED".equalsIgnoreCase(e.getOhApprovalStatus()) || "REJECTED".equalsIgnoreCase(e.getAdminApprovalStatus())) continue;
             if (e.getSentAt() == null || !e.getSentAt().toLocalDate().equals(today)) continue;
             if (e.getProjectId() == null) continue;
             BigDecimal pay = e.getApprovedValue() != null ? e.getApprovedValue() : safe(e.getSentAmount());

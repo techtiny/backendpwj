@@ -202,6 +202,7 @@ public class ExpenseItemService {
             BigDecimal newRemaining = safe(e.getPwjTotalPayable()).subtract(e.getSentAmount());
             e.setPaymentStatus(newRemaining.signum() <= 0 ? "FULL_PAYMENT_SENT" : "PART_PAYMENT_SENT");
             e.setSentAt(java.time.LocalDateTime.now());
+        e.setCeoApprovalStatus("PENDING");
             results.add(toDto(repo.save(e)));
         }
         return results;
@@ -250,6 +251,22 @@ public class ExpenseItemService {
     @Transactional
     public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks,
                                                  String paymentMadeAgainst, String paymentStage, String docNumber) {
+        return sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage, docNumber, null);
+    }
+
+    /** @param requiredBy optional date the payment is needed by (from the engineer's payment request). */
+    @Transactional
+    public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks,
+                                                 String paymentMadeAgainst, String paymentStage, String docNumber,
+                                                 java.time.LocalDate requiredBy) {
+        return sendPwjEntryForPayment(pwjEntryId, amount, remarks, paymentMadeAgainst, paymentStage, docNumber, requiredBy, null);
+    }
+
+    /** @param itemDescription optional — what is being paid for; replaces the PR's material text on the entry when given. */
+    @Transactional
+    public ExpenseItemDto sendPwjEntryForPayment(Long pwjEntryId, BigDecimal amount, String remarks,
+                                                 String paymentMadeAgainst, String paymentStage, String docNumber,
+                                                 java.time.LocalDate requiredBy, String itemDescription) {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("Amount must be greater than zero");
         }
@@ -314,7 +331,7 @@ public class ExpenseItemService {
         ExpenseItem e = new ExpenseItem();
         e.setProjectId(accountProjectId);
         e.setCategory(defaultCategoryFor(entry.getPwjType()));
-        e.setDescription(entry.getMaterialRequired());
+        e.setDescription(itemDescription != null && !itemDescription.isBlank() ? itemDescription.trim() : entry.getMaterialRequired());
         e.setPartyName(vendor);
         e.setRefNo(targetDocNumber);
         e.setPwjGross(gross);
@@ -326,6 +343,8 @@ public class ExpenseItemService {
         e.setSentAmount(amount);
         e.setPaymentStatus(newTotalForPo.compareTo(poValue) >= 0 ? "FULL_PAYMENT_SENT" : "PART_PAYMENT_SENT");
         e.setSentAt(java.time.LocalDateTime.now());
+        e.setCeoApprovalStatus("PENDING");
+        e.setRequiredByDate(requiredBy);
         if (remarks != null && !remarks.isBlank()) e.setRemarks(remarks.trim());
         if (paymentMadeAgainst != null && !paymentMadeAgainst.isBlank()) e.setPaymentMadeAgainst(paymentMadeAgainst.trim());
         if (paymentStage != null && !paymentStage.isBlank()) e.setPaymentStage(paymentStage.trim());
@@ -480,6 +499,10 @@ public class ExpenseItemService {
 
     /** OH reviews a sent entry: may revise sentAmount, then Approve or Reject. Resets Admin + VP. */
     public ExpenseItemDto setOhApproval(Long id, String status, BigDecimal revisedAmount) {
+        return setOhApproval(id, status, revisedAmount, null);
+    }
+
+    public ExpenseItemDto setOhApproval(Long id, String status, BigDecimal revisedAmount, String remark) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
@@ -492,15 +515,33 @@ public class ExpenseItemService {
             e.setSentAmount(revisedAmount);
             recomputeDeductions(e);
         }
+        applyDecisionRemark(e, "OH", status, remark);
         e.setOhApprovalStatus(status);
         // A fresh OH decision supersedes any later decision on the old amount
         e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
+        e.setCeoApprovalStatus("PENDING");
         return toDto(repo.save(e));
+    }
+
+    /** Rejecting needs a reason; approving clears an earlier rejection at the same level. */
+    private void applyDecisionRemark(ExpenseItem e, String level, String status, String remark) {
+        if ("REJECTED".equals(status)) {
+            if (remark == null || remark.isBlank()) throw new IllegalArgumentException("Enter a reason for rejecting");
+            e.setRejectionRemark(remark.trim());
+            e.setRejectedAtLevel(level);
+        } else if (level.equals(e.getRejectedAtLevel())) {
+            e.setRejectionRemark(null);
+            e.setRejectedAtLevel(null);
+        }
     }
 
     /** Admin reviews an OH-approved entry: Approve or Reject (no amount revision). Resets VP. */
     public ExpenseItemDto setAdminApproval(Long id, String status) {
+        return setAdminApproval(id, status, null);
+    }
+
+    public ExpenseItemDto setAdminApproval(Long id, String status, String remark) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
@@ -509,13 +550,19 @@ public class ExpenseItemService {
         if (!"APPROVED".equals(normalizeApproval(e.getOhApprovalStatus()))) {
             throw new IllegalArgumentException("Entry #" + id + " must be OH-approved before Admin approval");
         }
+        applyDecisionRemark(e, "ADMIN", status, remark);
         e.setAdminApprovalStatus(status);
         e.setVpApprovalStatus("PENDING");
+        e.setCeoApprovalStatus("PENDING");
         return toDto(repo.save(e));
     }
 
     /** VP reviews an Admin-approved entry: Approve or Reject (no amount revision). */
     public ExpenseItemDto setVpApproval(Long id, String status) {
+        return setVpApproval(id, status, null);
+    }
+
+    public ExpenseItemDto setVpApproval(Long id, String status, String remark) {
         ExpenseItem e = repo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
         if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
@@ -524,7 +571,30 @@ public class ExpenseItemService {
         if (!"APPROVED".equals(normalizeApproval(e.getAdminApprovalStatus()))) {
             throw new IllegalArgumentException("Entry #" + id + " must be Admin-approved before VP approval");
         }
+        applyDecisionRemark(e, "VP", status, remark);
         e.setVpApprovalStatus(status);
+        e.setCeoApprovalStatus("PENDING");
+        return toDto(repo.save(e));
+    }
+
+    /** Level 4 (CEO) status. Entries sent before Level 4 existed have no CEO status: once VP-approved they count as CEO-approved. */
+    public static String effectiveCeoStatus(ExpenseItem e) {
+        if (e.getCeoApprovalStatus() != null && !e.getCeoApprovalStatus().isBlank()) return e.getCeoApprovalStatus();
+        return "APPROVED".equals(e.getVpApprovalStatus()) ? "APPROVED" : "PENDING";
+    }
+
+    /** CEO reviews a VP-approved entry: Approve or Reject (Level 4). */
+    public ExpenseItemDto setCeoApproval(Long id, String status, String remark) {
+        ExpenseItem e = repo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense item not found: " + id));
+        if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
+            throw new IllegalArgumentException("status must be APPROVED or REJECTED");
+        }
+        if (!"APPROVED".equals(normalizeApproval(e.getVpApprovalStatus()))) {
+            throw new IllegalArgumentException("Entry #" + id + " must be VP-approved before CEO approval");
+        }
+        applyDecisionRemark(e, "CEO", status, remark);
+        e.setCeoApprovalStatus(status);
         return toDto(repo.save(e));
     }
 
@@ -537,6 +607,7 @@ public class ExpenseItemService {
         }
         e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
+        e.setCeoApprovalStatus("PENDING");
         return toDto(repo.save(e));
     }
 
@@ -562,6 +633,7 @@ public class ExpenseItemService {
         recomputeDeductions(e);
         e.setAdminApprovalStatus("PENDING");
         e.setVpApprovalStatus("PENDING");
+        e.setCeoApprovalStatus("PENDING");
         return toDto(repo.save(e));
     }
 
@@ -614,7 +686,7 @@ public class ExpenseItemService {
 
     /**
      * An earlier Send for Payment request on the same doc that is still in the approval chain —
-     * not rejected at any level and not yet Level 3 VP approved.
+     * not rejected at any level and not yet Level 4 CEO approved.
      */
     private java.util.Optional<ExpenseItem> findPendingRequest(Long projectId, String refNo) {
         return repo.findByProjectIdAndRefNo(projectId, refNo).stream()
@@ -622,7 +694,8 @@ public class ExpenseItemService {
                 .filter(e -> !"REJECTED".equals(normalizeApproval(e.getOhApprovalStatus()))
                         && !"REJECTED".equals(normalizeApproval(e.getAdminApprovalStatus()))
                         && !"REJECTED".equals(normalizeApproval(e.getVpApprovalStatus()))
-                        && !"APPROVED".equals(normalizeApproval(e.getVpApprovalStatus())))
+                        && !"REJECTED".equals(effectiveCeoStatus(e))
+                        && !"APPROVED".equals(effectiveCeoStatus(e)))
                 .findFirst();
     }
 
@@ -690,9 +763,13 @@ public class ExpenseItemService {
         d.setPaymentStatus(isNotSent(e.getPaymentStatus()) ? "NOT_SENT" : e.getPaymentStatus());
         d.setSentAmount(safe(e.getSentAmount()));
         d.setSentAt(e.getSentAt());
+        d.setRequiredByDate(e.getRequiredByDate());
+        d.setRejectionRemark(e.getRejectionRemark());
+        d.setRejectedAtLevel(e.getRejectedAtLevel());
         d.setOhApprovalStatus(normalizeApproval(e.getOhApprovalStatus()));
         d.setAdminApprovalStatus(normalizeApproval(e.getAdminApprovalStatus()));
         d.setVpApprovalStatus(normalizeApproval(e.getVpApprovalStatus()));
+        d.setCeoApprovalStatus(effectiveCeoStatus(e));
         d.setTdsPercent(e.getTdsPercent());
         d.setTdsAmount(e.getTdsAmount());
         d.setGstDeducted(Boolean.TRUE.equals(e.getGstDeducted()));

@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -42,6 +43,14 @@ public class PaymentRequest {
 
     @Column(name = "payment_stage", length = 30)
     private String paymentStage;
+
+    /** What is being paid for — fetched from the document's item lines, edited by the engineer. */
+    @Column(name = "item_description", length = 1000)
+    private String itemDescription;
+
+    /** Optional: the date by which the engineer needs this payment made. */
+    @Column(name = "required_by_date")
+    private LocalDate requiredByDate;
 
     /** Login of the requesting engineer, and their display name. */
     @Column(name = "requested_by", nullable = false, length = 100)

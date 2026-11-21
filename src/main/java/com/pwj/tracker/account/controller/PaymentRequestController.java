@@ -22,7 +22,7 @@ public class PaymentRequestController {
     public ResponseEntity<Map<String, Object>> raise(@RequestBody Map<String, Object> b) {
         return ResponseEntity.ok(service.raise(str(b.get("username")), Long.valueOf(String.valueOf(b.get("pwjEntryId"))),
                 new BigDecimal(String.valueOf(b.get("amount"))), str(b.get("remarks")),
-                str(b.get("paymentMadeAgainst")), str(b.get("paymentStage")), str(b.get("docNumber"))));
+                str(b.get("paymentMadeAgainst")), str(b.get("paymentStage")), str(b.get("docNumber")), str(b.get("requiredByDate")), str(b.get("itemDescription"))));
     }
 
     /** GET /api/payment-requests?username= — requests this user raised, must decide, or (oversight roles) all. */
