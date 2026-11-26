@@ -14,6 +14,9 @@ public interface FundMovementRepository extends JpaRepository<FundMovement, Long
 
     List<FundMovement> findAllByOrderByMovementDateDescIdDesc();
 
+    /** Every inter-project Fund Transfer leg (loans and repayments), oldest first. */
+    List<FundMovement> findByModeAndDirectionOrderByMovementDateAscIdAsc(String mode, String direction);
+
     boolean existsBySourceRef(String sourceRef);
 
     java.util.Optional<FundMovement> findBySourceRef(String sourceRef);
