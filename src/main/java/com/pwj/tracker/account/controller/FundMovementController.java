@@ -43,14 +43,29 @@ public class FundMovementController {
 
     /** POST /api/fund-management/transfer — { fromProjectId, toProjectId, amount, remarks } */
     @PostMapping("/transfer")
-    public ResponseEntity<Void> transfer(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Map<String, Object>> transfer(@RequestBody Map<String, Object> body) {
         Long from = body.get("fromProjectId") != null ? Long.valueOf(String.valueOf(body.get("fromProjectId"))) : null;
         Long to = body.get("toProjectId") != null ? Long.valueOf(String.valueOf(body.get("toProjectId"))) : null;
         java.math.BigDecimal amount = body.get("amount") != null
                 ? new java.math.BigDecimal(String.valueOf(body.get("amount"))) : null;
         String remarks = body.get("remarks") != null ? String.valueOf(body.get("remarks")) : null;
-        service.transferFund(from, to, amount, remarks);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(service.transferFund(from, to, amount, remarks));
+    }
+
+    /** GET /api/fund-management/loans — outstanding inter-project debts (who borrowed from whom). */
+    @GetMapping("/loans")
+    public ResponseEntity<List<Map<String, Object>>> loans() {
+        return ResponseEntity.ok(service.loans());
+    }
+
+    /** POST /api/fund-management/repay — { borrowerId, lenderId, amount? } — amount defaults to the full outstanding. */
+    @PostMapping("/repay")
+    public ResponseEntity<Map<String, Object>> repay(@RequestBody Map<String, Object> body) {
+        Long borrower = body.get("borrowerId") != null ? Long.valueOf(String.valueOf(body.get("borrowerId"))) : null;
+        Long lender = body.get("lenderId") != null ? Long.valueOf(String.valueOf(body.get("lenderId"))) : null;
+        Object a = body.get("amount");
+        java.math.BigDecimal amount = a != null && !String.valueOf(a).isBlank() ? new java.math.BigDecimal(String.valueOf(a)) : null;
+        return ResponseEntity.ok(service.repay(borrower, lender, amount));
     }
 
     @PostMapping

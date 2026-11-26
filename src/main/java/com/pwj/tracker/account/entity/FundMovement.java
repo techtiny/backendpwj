@@ -50,6 +50,11 @@ public class FundMovement {
     @Column(name = "source_ref", length = 40)
     private String sourceRef;
 
+    /** For an inter-project Fund Transfer leg: the project on the other side (lender for the INFLOW leg, borrower for
+     *  the OUTFLOW leg). Older transfers recorded before this column existed are matched by project name instead. */
+    @Column(name = "counterparty_project_id")
+    private Long counterpartyProjectId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -64,6 +69,8 @@ public class FundMovement {
     public void setMovementDate(LocalDate movementDate) { this.movementDate = movementDate; }
     public String getParty() { return party; }
     public void setParty(String party) { this.party = party; }
+    public Long getCounterpartyProjectId() { return counterpartyProjectId; }
+    public void setCounterpartyProjectId(Long counterpartyProjectId) { this.counterpartyProjectId = counterpartyProjectId; }
     public Long getProjectId() { return projectId; }
     public void setProjectId(Long projectId) { this.projectId = projectId; }
     public BigDecimal getAmount() { return amount; }
