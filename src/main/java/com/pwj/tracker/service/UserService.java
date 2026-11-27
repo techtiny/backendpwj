@@ -103,7 +103,11 @@ public class UserService {
         }
         // New login → Employee Master profile, linked from the start (never lets a profile problem block user creation).
         if (!Boolean.TRUE.equals(user.getIsTestAccount())) {
-            try { employeeService.ensureProfileForLogin(user); }
+            try {
+                // An existing Employee Master record (e.g. staff already on the master sheet) is linked, not duplicated.
+                if (req.getEmployeeId() != null) employeeService.link(req.getEmployeeId(), user.getUsername());
+                employeeService.ensureProfileForLogin(user);
+            }
             catch (Exception e) { log.warn("Could not auto-create Employee Master profile for {}: {}", user.getUsername(), e.getMessage()); }
         }
         user = userRepository.findById(user.getId()).orElse(user); // employee number now mirrors the new person code

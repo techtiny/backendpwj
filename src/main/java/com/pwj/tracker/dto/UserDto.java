@@ -37,6 +37,7 @@ public class UserDto {
         public String employeeNumber;   // optional — auto-assigned (EMP0001…) when blank
         public String designation;      // optional — shown on the profile and copied to the Employee Master record
         @NotNull  public AppUser.Role role;
+        public Long employeeId;         // optional — link to this existing Employee Master record instead of creating one
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
