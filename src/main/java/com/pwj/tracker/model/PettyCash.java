@@ -81,6 +81,10 @@ public class PettyCash {
     @Column(name = "attachment_url", length = 500)
     private String attachmentUrl;
 
+    // JSON array of every receipt / invoice attached when the request was raised (attachmentUrl keeps the first one)
+    @Column(name = "attachment_urls", columnDefinition = "TEXT")
+    private String attachmentUrls;
+
     @Column(name = "cash_transferred_at")
     private LocalDateTime cashTransferredAt;
 

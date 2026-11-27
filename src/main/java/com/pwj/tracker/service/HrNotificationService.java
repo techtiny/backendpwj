@@ -41,6 +41,7 @@ public class HrNotificationService {
     private final PerformanceRemarkRepository remarkRepo;
     private final EmployeeService employeeService;
     private final SalaryStatementRequestRepository statementRepo;
+    private final ResignationService resignationService;
 
     public List<Map<String, Object>> forUser(String username) {
         AppUser u = userRepo.findByUsernameAndActiveTrue(username == null ? "" : username)
@@ -60,7 +61,12 @@ public class HrNotificationService {
         if (role == AppUser.Role.ADMIN || role == AppUser.Role.VP) {
             long n = statementRepo.findByStatusOrderByCreatedAtDesc("PENDING").stream()
                     .filter(r -> !me.equalsIgnoreCase(r.getUsername())).count();
-            add(out, "statement", n, "salary statement request", "awaiting your approval", "hr", "salary-statements");
+            add(out, "statement", n, "payslip request", "awaiting your approval", "hr", "salary-statements");
+        }
+
+        // Resignations submitted by employees, for VP / Admin to review
+        if (role == AppUser.Role.ADMIN || role == AppUser.Role.VP) {
+            add(out, "resignation", resignationService.submittedCount(me), "resignation", "awaiting your review", "hr", "resignations");
         }
 
         // Petty cash and reimbursement

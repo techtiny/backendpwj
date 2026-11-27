@@ -30,12 +30,22 @@ public class PettyCashController {
                 ? LocalDate.parse(body.get("expenseDate").toString()) : null;
         String attachmentUrl = body.get("attachmentUrl") != null
                 ? body.get("attachmentUrl").toString() : null;
+        // Several receipts / invoices may be attached: stored as a JSON list, the first also kept in attachmentUrl.
+        String attachmentUrlsJson = null;
+        if (body.get("attachmentUrls") instanceof List<?> list && !list.isEmpty()) {
+            List<String> urls = list.stream().filter(java.util.Objects::nonNull).map(Object::toString).filter(u -> !u.isBlank()).toList();
+            if (!urls.isEmpty()) {
+                if (attachmentUrl == null) attachmentUrl = urls.get(0);
+                try { attachmentUrlsJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(urls); }
+                catch (Exception e) { throw new RuntimeException("Could not read the attachments"); }
+            }
+        }
         String projectName = body.get("projectName") != null
                 ? body.get("projectName").toString() : null;
         String requestType = body.get("requestType") != null
                 ? body.get("requestType").toString() : "PETTY_CASH";
         return ResponseEntity.ok(ApiResponse.ok("Entry created",
-                service.create(username, date, category, description, amount, paymentMode, attachmentUrl, projectName, requestType)));
+                service.create(username, date, category, description, amount, paymentMode, attachmentUrl, attachmentUrlsJson, projectName, requestType)));
     }
 
     @GetMapping("/my/{username}")

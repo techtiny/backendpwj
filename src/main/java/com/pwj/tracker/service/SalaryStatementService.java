@@ -69,7 +69,7 @@ public class SalaryStatementService {
     public SalaryStatementRequest recordDownload(Long id, String username) {
         SalaryStatementRequest r = get(id);
         if (!r.getUsername().equalsIgnoreCase(username == null ? "" : username)) throw new RuntimeException("Not your request");
-        if (!"APPROVED".equals(r.getStatus())) throw new RuntimeException("This statement isn't approved");
+        if (!"APPROVED".equals(r.getStatus())) throw new RuntimeException("This payslip isn't approved");
         r.setDownloadCount(r.getDownloadCount() + 1);
         r.setLastDownloadedAt(LocalDateTime.now());
         return repo.save(r);
@@ -88,7 +88,7 @@ public class SalaryStatementService {
 
     private AppUser requireApprover(String username) {
         AppUser a = actor(username);
-        if (!APPROVERS.contains(a.getRole())) throw new RuntimeException("Only Admin or VP can approve a salary statement");
+        if (!APPROVERS.contains(a.getRole())) throw new RuntimeException("Only Admin or VP can approve a payslip");
         return a;
     }
 }

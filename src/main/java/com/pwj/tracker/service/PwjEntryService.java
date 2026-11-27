@@ -518,6 +518,10 @@ public class PwjEntryService {
                 m.put("baseDocNumber",    baseDocNumber);
                 m.put("isAdditionalPo",   i > 0);
                 m.put("clubbedPrs",       clubbedPrs);
+                // For the Cash Flow planner: which BOQ item the document is issued against, and its key dates.
+                m.put("boqNo",            e.getBoqNo());
+                m.put("issuedAt",         e.getApprovedAt());
+                m.put("requiredDate",     e.getDateOfRequirement());
 
                 double gross = 0;
                 double gstPct = 18;

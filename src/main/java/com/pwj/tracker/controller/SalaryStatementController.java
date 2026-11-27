@@ -20,25 +20,25 @@ public class SalaryStatementController {
     /** POST — body: username, year, month. */
     @PostMapping
     public ResponseEntity<ApiResponse<SalaryStatementRequest>> request(@RequestBody Map<String, Object> body) {
-        return ResponseEntity.ok(ApiResponse.ok("Salary statement requested",
+        return ResponseEntity.ok(ApiResponse.ok("Payslip requested",
                 service.request(str(body.get("username")), num(body.get("year")), num(body.get("month")))));
     }
 
     @GetMapping("/my/{username}")
     public ResponseEntity<ApiResponse<List<SalaryStatementRequest>>> mine(@PathVariable String username) {
-        return ResponseEntity.ok(ApiResponse.ok("My statements", service.mine(username)));
+        return ResponseEntity.ok(ApiResponse.ok("My payslips", service.mine(username)));
     }
 
     /** Admin / VP — requests waiting for approval. */
     @GetMapping("/pending")
     public ResponseEntity<ApiResponse<List<SalaryStatementRequest>>> pending(@RequestParam String username) {
-        return ResponseEntity.ok(ApiResponse.ok("Pending statements", service.pending(username)));
+        return ResponseEntity.ok(ApiResponse.ok("Pending payslips", service.pending(username)));
     }
 
     /** Admin / VP / OH / CEO — the issue log for monitoring. */
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<SalaryStatementRequest>>> all(@RequestParam String username) {
-        return ResponseEntity.ok(ApiResponse.ok("All statements", service.all(username)));
+        return ResponseEntity.ok(ApiResponse.ok("All payslips", service.all(username)));
     }
 
     @PutMapping("/{id}/approve")
