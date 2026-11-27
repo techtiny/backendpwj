@@ -31,6 +31,29 @@ public class OfficeExpense {
     @Column(nullable = false, length = 10)
     private String kind;
 
+    /** MANAGEMENT (incl. the monthly Office Mgnt salaries) or OFFICE. */
+    @Column(length = 12)
+    private String division;
+
+    /** ONE_TIME, WEEKLY, MONTHLY or YEARLY. A repeating expense gets a new line each period (salaries are MONTHLY). */
+    @Column(length = 10)
+    private String frequency;
+
+    /** For a repeated copy: the id of the expense it repeats. */
+    @Column(name = "recur_source_id")
+    private Long recurSourceId;
+
+    /** Ticked and sent from HR → Office/Mgnt; only these appear in Accounts → Weekly Payments → Office/Mgnt. */
+    @Column(name = "sent_for_payment")
+    private Boolean sentForPayment;
+
+    @Column(name = "sent_for_payment_at")
+    private java.time.LocalDateTime sentForPaymentAt;
+
+    /** Shown in Funds → Cash Flow → Planned Outflow (with its upcoming repeats). */
+    @Column(name = "in_cash_flow")
+    private Boolean inCashFlow;
+
     /** Month the line belongs to, YYYY-MM. */
     @Column(name = "period_month", nullable = false, length = 7)
     private String periodMonth;
@@ -94,4 +117,12 @@ public class OfficeExpense {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /** Copies a staff member's bank details onto this line (no-op when null or they have none). */
+    public OfficeExpense withBankFrom(OfficeStaff s) {
+        if (s != null && s.getAccountNumber() != null && !s.getAccountNumber().isBlank()) {
+            bankName = s.getBankName(); accountNumber = s.getAccountNumber(); ifsc = s.getIfsc();
+        }
+        return this;
+    }
 }

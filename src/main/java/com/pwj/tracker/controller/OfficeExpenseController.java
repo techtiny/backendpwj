@@ -25,13 +25,15 @@ public class OfficeExpenseController {
     @GetMapping("/expenses")
     public ResponseEntity<ApiResponse<List<OfficeExpense>>> list(@RequestParam String username,
                                                                 @RequestParam(required = false) String month,
-                                                                @RequestParam(required = false) String status) {
-        return ResponseEntity.ok(ApiResponse.ok("Office expenses", service.list(username, month, status)));
+                                                                @RequestParam(required = false) String status,
+                                                                @RequestParam(required = false) String division,
+                                                                @RequestParam(required = false, defaultValue = "false") boolean forPayments) {
+        return ResponseEntity.ok(ApiResponse.ok("Office expenses", service.list(username, month, status, division, forPayments)));
     }
 
     @PostMapping("/expenses")
     public ResponseEntity<ApiResponse<OfficeExpense>> raise(@RequestBody Map<String, Object> b) {
-        return ResponseEntity.ok(ApiResponse.ok("Office expense raised", service.raise(str(b.get("username")), date(b.get("expenseDate")),
+        return ResponseEntity.ok(ApiResponse.ok("Office expense raised", service.raise(str(b.get("username")), str(b.get("division")), str(b.get("frequency")), date(b.get("expenseDate")),
                 str(b.get("category")), str(b.get("description")), str(b.get("payee")), num(b.get("amount")), str(b.get("attachmentUrls")),
                 str(b.get("bankName")), str(b.get("accountNumber")), str(b.get("ifsc")))));
     }
@@ -41,7 +43,7 @@ public class OfficeExpenseController {
         return ResponseEntity.ok(ApiResponse.ok("Office expense updated", service.update(id, str(b.get("username")), date(b.get("expenseDate")),
                 str(b.get("category")), str(b.get("description")), str(b.get("payee")), num(b.get("amount")),
                 str(b.get("remarks")), str(b.get("attachmentUrls")),
-                str(b.get("bankName")), str(b.get("accountNumber")), str(b.get("ifsc")))));
+                str(b.get("bankName")), str(b.get("accountNumber")), str(b.get("ifsc")), str(b.get("frequency")))));
     }
 
     @DeleteMapping("/expenses/{id}")
@@ -65,6 +67,34 @@ public class OfficeExpenseController {
     @PutMapping("/expenses/{id}/unpaid")
     public ResponseEntity<ApiResponse<OfficeExpense>> unpaid(@PathVariable Long id, @RequestBody Map<String, Object> b) {
         return ResponseEntity.ok(ApiResponse.ok("Marked unpaid", service.markUnpaid(id, str(b.get("username")))));
+    }
+
+    /** HR → Send for Payment — body: username, ids. */
+    @PostMapping("/expenses/send-to-payments")
+    public ResponseEntity<ApiResponse<List<OfficeExpense>>> sendToPayments(@RequestBody Map<String, Object> b) {
+        return ResponseEntity.ok(ApiResponse.ok("Sent to Weekly Payments", service.sendToPayments(str(b.get("username")), ids(b))));
+    }
+
+    @PostMapping("/expenses/recall-from-payments")
+    public ResponseEntity<ApiResponse<List<OfficeExpense>>> recall(@RequestBody Map<String, Object> b) {
+        return ResponseEntity.ok(ApiResponse.ok("Taken back from Weekly Payments", service.recallFromPayments(str(b.get("username")), ids(b))));
+    }
+
+    /** Cash Flow — body: username, ids, on (true = add to Planned Outflow, false = remove). */
+    @PostMapping("/expenses/cash-flow")
+    public ResponseEntity<ApiResponse<List<OfficeExpense>>> cashFlowFlag(@RequestBody Map<String, Object> b) {
+        boolean on = b.get("on") == null || Boolean.parseBoolean(b.get("on").toString());
+        return ResponseEntity.ok(ApiResponse.ok(on ? "Added to Cash Flow" : "Removed from Cash Flow", service.setCashFlow(str(b.get("username")), ids(b), on)));
+    }
+
+    /** Planned outflow items for Funds → Cash Flow → Planned Outflow (marked lines + upcoming repeats). */
+    @GetMapping("/cash-flow")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> cashFlow(@RequestParam String username) {
+        return ResponseEntity.ok(ApiResponse.ok("Office/Mgnt planned outflow", service.cashFlow(username)));
+    }
+
+    private static List<Long> ids(Map<String, Object> b) {
+        return b.get("ids") instanceof List<?> l ? l.stream().map(x -> Long.valueOf(x.toString())).toList() : List.of();
     }
 
     @GetMapping("/staff")

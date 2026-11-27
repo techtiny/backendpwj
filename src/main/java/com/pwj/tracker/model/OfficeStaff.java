@@ -29,7 +29,7 @@ public class OfficeStaff {
     @Column(length = 60)
     private String designation;
 
-    /** Unused — kept for the existing column; each month's amount is entered on its salary line. */
+    /** Default amount put on each month's salary line (editable on the line for that month). */
     @Column(name = "monthly_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal monthlyAmount;
 
