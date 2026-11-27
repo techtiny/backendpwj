@@ -97,6 +97,7 @@ public class OfficeExpenseService {
         if (status != null && !status.isBlank()) rows = rows.stream().filter(r -> status.equalsIgnoreCase(r.getStatus())).toList();
         if (division != null && !division.isBlank()) rows = rows.stream().filter(r -> division.equalsIgnoreCase(r.getDivision())).toList();
         if (forPayments) rows = rows.stream().filter(r -> Boolean.TRUE.equals(r.getSentForPayment())).toList();
+        rows = rows.stream().filter(r -> !Boolean.TRUE.equals(r.getDeleted())).toList();
         return rows;
     }
 
@@ -207,7 +208,7 @@ public class OfficeExpenseService {
         ensureSalaries();
         LocalDate today = LocalDate.now(), horizon = today.plusMonths(12);
         List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
-        List<OfficeExpense> marked = repo.findAll().stream().filter(e -> Boolean.TRUE.equals(e.getInCashFlow())).toList();
+        List<OfficeExpense> marked = repo.findAll().stream().filter(e -> Boolean.TRUE.equals(e.getInCashFlow()) && !Boolean.TRUE.equals(e.getDeleted())).toList();
         for (OfficeExpense e : marked) out.add(item(e, dueOf(e), false));
         // Upcoming repeats — expenses: from the latest line of each series; salaries: monthly per staff member.
         java.util.Map<String, OfficeExpense> latest = new java.util.HashMap<>();
@@ -278,14 +279,14 @@ public class OfficeExpenseService {
     // ── Expenses ───────────────────────────────────────────────────────────────────────────────────────────────
 
     @Transactional
-    public OfficeExpense raise(String actor, String division, String frequency, LocalDate date, String category, String description, String payee,
+    public OfficeExpense raise(String actor, String division, String frequency, LocalDate date, LocalDate cycleEndDate, String category, String description, String payee,
                               BigDecimal amount, String attachmentUrls, String bankName, String accountNumber, String ifsc) {
         AppUser a = manager(actor);
         if (date == null) date = LocalDate.now();
         if (category == null || category.isBlank()) throw new RuntimeException("Choose a category");
         if (amount == null || amount.signum() <= 0) throw new RuntimeException("Enter an amount greater than zero");
         return repo.save(OfficeExpense.builder().kind("EXPENSE").division(division(division)).frequency(frequency(frequency)).periodMonth(YearMonth.from(date).toString())
-                .expenseDate(date).category(category.trim()).description(trim(description)).payee(trim(payee))
+                .expenseDate(date).cycleEndDate(cycleEndDate).category(category.trim()).description(trim(description)).payee(trim(payee))
                 .amount(amount).attachmentUrls(attachmentUrls).bankName(trim(bankName)).accountNumber(trim(accountNumber)).ifsc(upper(ifsc))
                 .status("PENDING").raisedBy(a.getFullName()).build()
                 .withBankFrom(staffNamed(payee)));
@@ -293,7 +294,7 @@ public class OfficeExpenseService {
 
     /** Edit a PENDING line. On a SALARY line only the amount and remarks can change. Null fields are unchanged. */
     @Transactional
-    public OfficeExpense update(Long id, String actor, LocalDate date, String category, String description, String payee,
+    public OfficeExpense update(Long id, String actor, LocalDate date, LocalDate cycleEndDate, boolean cycleEndGiven, String category, String description, String payee,
                                BigDecimal amount, String remarks, String attachmentUrls,
                                String bankName, String accountNumber, String ifsc, String frequency) {
         manager(actor);
@@ -311,6 +312,11 @@ public class OfficeExpenseService {
             e.setExpenseDate(date);
             // A salary stays in its own month (one line per person per month); an expense moves with its date.
             if (!salary) e.setPeriodMonth(YearMonth.from(date).toString());
+        }
+        if (cycleEndGiven) {
+            if (cycleEndDate != null && e.getExpenseDate() != null && cycleEndDate.isBefore(e.getExpenseDate()))
+                throw new RuntimeException("Cycle end date can't be before the start date");
+            e.setCycleEndDate(cycleEndDate);
         }
         if (category != null && !category.isBlank()) e.setCategory(category.trim());
         if (payee != null && !payee.isBlank()) { e.setPayee(trim(payee)); e.withBankFrom(staffNamed(payee)); }
@@ -333,9 +339,12 @@ public class OfficeExpenseService {
         manager(actor);
         OfficeExpense e = get(id);
         if (!"PENDING".equals(e.getStatus())) throw new RuntimeException("A paid line can't be deleted");
-        if ("SALARY".equals(e.getKind()) && e.getStaffId() != null
-                && staffRepo.findById(e.getStaffId()).map(OfficeStaff::getActive).orElse(false))
-            throw new RuntimeException("Monthly salary lines are created automatically — change the amount (e.g. to 0) instead, or deactivate the staff member");
+        if ("SALARY".equals(e.getKind())) {
+            // Kept hidden so the monthly salary isn't created again for this month.
+            e.setDeleted(true); e.setSentForPayment(false); e.setInCashFlow(false);
+            repo.save(e);
+            return;
+        }
         repo.delete(e);
     }
 

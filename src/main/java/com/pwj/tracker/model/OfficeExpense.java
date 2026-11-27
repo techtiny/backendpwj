@@ -50,6 +50,10 @@ public class OfficeExpense {
     @Column(name = "sent_for_payment_at")
     private java.time.LocalDateTime sentForPaymentAt;
 
+    /** A deleted monthly salary line is kept (hidden) so it isn't created again for that month. */
+    @Column(name = "deleted")
+    private Boolean deleted;
+
     /** Shown in Funds → Cash Flow → Planned Outflow (with its upcoming repeats). */
     @Column(name = "in_cash_flow")
     private Boolean inCashFlow;
@@ -60,6 +64,10 @@ public class OfficeExpense {
 
     @Column(name = "expense_date")
     private LocalDate expenseDate;
+
+    /** Cycle end date; null = worked out from the start date and frequency. */
+    @Column(name = "cycle_end_date")
+    private LocalDate cycleEndDate;
 
     @Column(length = 60)
     private String category;

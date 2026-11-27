@@ -33,14 +33,14 @@ public class OfficeExpenseController {
 
     @PostMapping("/expenses")
     public ResponseEntity<ApiResponse<OfficeExpense>> raise(@RequestBody Map<String, Object> b) {
-        return ResponseEntity.ok(ApiResponse.ok("Office expense raised", service.raise(str(b.get("username")), str(b.get("division")), str(b.get("frequency")), date(b.get("expenseDate")),
+        return ResponseEntity.ok(ApiResponse.ok("Office expense raised", service.raise(str(b.get("username")), str(b.get("division")), str(b.get("frequency")), date(b.get("expenseDate")), date(b.get("cycleEndDate")),
                 str(b.get("category")), str(b.get("description")), str(b.get("payee")), num(b.get("amount")), str(b.get("attachmentUrls")),
                 str(b.get("bankName")), str(b.get("accountNumber")), str(b.get("ifsc")))));
     }
 
     @PutMapping("/expenses/{id}")
     public ResponseEntity<ApiResponse<OfficeExpense>> update(@PathVariable Long id, @RequestBody Map<String, Object> b) {
-        return ResponseEntity.ok(ApiResponse.ok("Office expense updated", service.update(id, str(b.get("username")), date(b.get("expenseDate")),
+        return ResponseEntity.ok(ApiResponse.ok("Office expense updated", service.update(id, str(b.get("username")), date(b.get("expenseDate")), date(b.get("cycleEndDate")), b.containsKey("cycleEndDate"),
                 str(b.get("category")), str(b.get("description")), str(b.get("payee")), num(b.get("amount")),
                 str(b.get("remarks")), str(b.get("attachmentUrls")),
                 str(b.get("bankName")), str(b.get("accountNumber")), str(b.get("ifsc")), str(b.get("frequency")))));
