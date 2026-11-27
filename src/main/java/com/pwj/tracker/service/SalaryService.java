@@ -240,8 +240,10 @@ public class SalaryService {
         BigDecimal unauthorizedDays = BigDecimal.valueOf(unauthorizedDates.size());
         // Unauthorized no-shows skip the free-CL grace entirely, and cost 1.5 LOP days each —
         // stricter than leave that was actually applied for.
+        BigDecimal manualLop = manualMarkedLop(u, monthStart, monthEnd, holidays);
         BigDecimal computedLop = leaveDays.subtract(BigDecimal.valueOf(FREE_CL_PER_MONTH)).max(BigDecimal.ZERO)
-                .add(unauthorizedDays.multiply(UNAUTHORIZED_LOP_MULTIPLIER));
+                .add(unauthorizedDays.multiply(UNAUTHORIZED_LOP_MULTIPLIER))
+                .add(manualLop);
 
         BigDecimal autoExtra = autoExtraWorkingDays(u, monthStart, monthEnd, holidays);
         BigDecimal extra = a != null && a.getExtraWorkingDays() != null ? a.getExtraWorkingDays() : autoExtra;
@@ -271,7 +273,9 @@ public class SalaryService {
         BigDecimal aEmployer = aPf;
 
         String remarks = a != null && a.getRemarks() != null && !a.getRemarks().isBlank()
-                ? a.getRemarks() : autoRemark(leaveDays, lop, unauthorizedDays);
+                ? a.getRemarks() : manualLop.signum() > 0 && leaveDays.signum() == 0 && unauthorizedDays.signum() == 0
+                    ? strip(lop).toPlainString() + " LOP — absent / half days marked by HR"
+                    : autoRemark(leaveDays, lop, unauthorizedDays) + (manualLop.signum() > 0 ? " + " + strip(manualLop).toPlainString() + " LOP marked by HR" : "");
 
         return SalaryDto.SheetRow.builder()
                 .userId(u.getId()).employeeNumber(u.getEmployeeNumber()).name(u.getFullName())
@@ -348,6 +352,21 @@ public class SalaryService {
             days.add(d);
         }
         return days;
+    }
+
+    /** Staff with manual attendance (Office Staff): each day HR marked ABSENT costs 1 LOP day, HALF_DAY ½ —
+     *  on working days not already covered by approved leave. Unmarked days count as present. */
+    private BigDecimal manualMarkedLop(AppUser u, LocalDate monthStart, LocalDate monthEnd, Set<LocalDate> holidays) {
+        if (!AppUser.MANUAL_ATTENDANCE_ROLES.contains(u.getRole())) return BigDecimal.ZERO;
+        Set<LocalDate> leaveCovered = leaveCoveredDates(u.getUsername(), monthStart, monthEnd);
+        BigDecimal total = BigDecimal.ZERO;
+        for (Attendance att : attendanceRepo.findByUsernameAndWorkDateBetween(u.getUsername(), monthStart, monthEnd)) {
+            LocalDate d = att.getWorkDate();
+            if (d.getDayOfWeek() == DayOfWeek.SUNDAY || holidays.contains(d) || leaveCovered.contains(d)) continue;
+            if ("ABSENT".equals(att.getStatus())) total = total.add(BigDecimal.ONE);
+            else if ("HALF_DAY".equals(att.getStatus())) total = total.add(new BigDecimal("0.5"));
+        }
+        return total;
     }
 
     /** Sunday or a declared holiday, with a completed check-in + check-out that day — an

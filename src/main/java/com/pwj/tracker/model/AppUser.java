@@ -100,9 +100,12 @@ public class AppUser {
      *  (it only has to be left out here if it genuinely shouldn't check in). */
     public static final java.util.Set<Role> CHECKIN_ROLES = java.util.EnumSet.complementOf(java.util.EnumSet.of(Role.VP, Role.OH, Role.CEO, Role.OFFICE_STAFF));
 
+    /** Roles that never check in: HR marks their attendance by hand (Present / Half Day / Absent) on the HR Dashboard. */
+    public static final java.util.Set<Role> MANUAL_ATTENDANCE_ROLES = java.util.EnumSet.of(Role.OFFICE_STAFF);
+
     public enum Role {
         ADMIN, ENGINEER, PROCUREMENT, VP, OH, CEO, PROJECT_MANAGER, PROCUREMENT_ENGINEER, COSTING_PLANNING_ENGINEER, BILLING_ENGINEER,
-        /** Office helper on the payroll — no app work, no check-in (never marked absent). */
+        /** Office helper on the payroll — no app work, no check-in; HR marks attendance manually. */
         OFFICE_STAFF
     }
 }

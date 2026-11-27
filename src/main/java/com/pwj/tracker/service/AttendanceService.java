@@ -140,7 +140,9 @@ public class AttendanceService {
     }
 
     public List<Attendance> getFieldStaffAttendance() {
-        List<AppUser.Role> fieldRoles = List.copyOf(AppUser.CHECKIN_ROLES);
+        java.util.Set<AppUser.Role> roles = java.util.EnumSet.copyOf(AppUser.CHECKIN_ROLES);
+        roles.addAll(AppUser.MANUAL_ATTENDANCE_ROLES);   // manually-marked staff show in the records too
+        List<AppUser.Role> fieldRoles = List.copyOf(roles);
         List<String> usernames = userRepository.findByRoleInAndActiveTrue(fieldRoles)
                 .stream().map(AppUser::getUsername).toList();
         if (usernames.isEmpty()) return List.of();
@@ -282,6 +284,64 @@ public class AttendanceService {
             att.setTotalMinutes((int) minutes);
             att.setStatus(minutes >= 240 ? "PRESENT" : "HALF_DAY");
         }
+        return attendanceRepository.save(att);
+    }
+
+    // ── Manual attendance (roles that never check in, e.g. Office Staff) ──
+
+    private static final Set<String> MANUAL_STATUSES = Set.of("PRESENT", "HALF_DAY", "ABSENT");
+    private static final Set<AppUser.Role> MARKERS = java.util.EnumSet.of(AppUser.Role.ADMIN, AppUser.Role.VP, AppUser.Role.OH, AppUser.Role.CEO);
+
+    /** Active staff whose attendance is marked by hand. */
+    public List<AppUser> manualStaff() {
+        return userRepository.findByRoleInAndActiveTrue(List.copyOf(AppUser.MANUAL_ATTENDANCE_ROLES)).stream()
+                .sorted(Comparator.comparing(u -> u.getFullName() == null ? "" : u.getFullName())).toList();
+    }
+
+    /** Manual staff and their records for one month (YYYY-MM). */
+    public Map<String, Object> manualMonth(String month) {
+        java.time.YearMonth ym = month == null || month.isBlank() ? java.time.YearMonth.now(IST) : java.time.YearMonth.parse(month);
+        List<AppUser> staff = manualStaff();
+        List<String> names = staff.stream().map(AppUser::getUsername).toList();
+        List<Attendance> recs = names.isEmpty() ? List.of()
+                : attendanceRepository.findByUsernameInOrderByWorkDateDescCheckInTimeDesc(names).stream()
+                    .filter(a -> !a.getWorkDate().isBefore(ym.atDay(1)) && !a.getWorkDate().isAfter(ym.atEndOfMonth())).toList();
+        List<Map<String, Object>> people = staff.stream().map(u -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("username", u.getUsername());
+            m.put("fullName", u.getFullName());
+            m.put("employeeNumber", u.getEmployeeNumber());
+            return m;
+        }).toList();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("month", ym.toString());
+        out.put("staff", people);
+        out.put("records", recs);
+        return out;
+    }
+
+    /** HR marks a day for a manual-attendance employee. status = PRESENT / HALF_DAY / ABSENT, or CLEAR to remove the mark. */
+    @Transactional
+    public Attendance markManual(String username, LocalDate date, String status, String markedBy) {
+        AppUser marker = userRepository.findByUsernameAndActiveTrue(markedBy == null ? "" : markedBy)
+                .orElseThrow(() -> new RuntimeException("Unknown user"));
+        if (!MARKERS.contains(marker.getRole())) throw new RuntimeException("Only Admin / VP / OH / CEO can mark attendance");
+        AppUser u = userRepository.findByUsernameAndActiveTrue(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        if (!AppUser.MANUAL_ATTENDANCE_ROLES.contains(u.getRole()))
+            throw new RuntimeException(u.getFullName() + " checks in themselves — attendance can't be marked manually");
+        if (date == null) date = LocalDate.now(IST);
+        if (date.isAfter(LocalDate.now(IST))) throw new RuntimeException("Can't mark a future date");
+        String st = status == null ? "" : status.trim().toUpperCase();
+        Optional<Attendance> existing = attendanceRepository.findByUsernameAndWorkDate(u.getUsername(), date);
+        if ("CLEAR".equals(st)) {
+            existing.ifPresent(attendanceRepository::delete);
+            return null;
+        }
+        if (!MANUAL_STATUSES.contains(st)) throw new RuntimeException("Status must be PRESENT, HALF_DAY or ABSENT");
+        Attendance att = existing.orElse(Attendance.builder().username(u.getUsername()).fullName(u.getFullName()).workDate(date).build());
+        att.setStatus(st);
+        att.setNotes("Marked manually by " + (marker.getFullName() != null ? marker.getFullName() : marker.getUsername()));
         return attendanceRepository.save(att);
     }
 

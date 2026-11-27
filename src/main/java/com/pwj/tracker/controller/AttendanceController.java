@@ -93,6 +93,21 @@ public class AttendanceController {
         return ResponseEntity.ok(ApiResponse.ok("Incomplete records", service.getIncompleteRecords()));
     }
 
+    /** GET /api/v1/hr/attendance/manual?month=YYYY-MM — staff whose attendance HR marks by hand, with that month's marks */
+    @GetMapping("/manual")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> manualMonth(@RequestParam(required = false) String month) {
+        return ResponseEntity.ok(ApiResponse.ok("Manual attendance", service.manualMonth(month)));
+    }
+
+    /** POST /api/v1/hr/attendance/manual — body: username, workDate (YYYY-MM-DD), status (PRESENT/HALF_DAY/ABSENT/CLEAR), markedBy */
+    @PostMapping("/manual")
+    public ResponseEntity<ApiResponse<Attendance>> markManual(@RequestBody Map<String, Object> body) {
+        Object d = body.get("workDate");
+        java.time.LocalDate date = d == null || String.valueOf(d).isBlank() ? null : java.time.LocalDate.parse(String.valueOf(d));
+        return ResponseEntity.ok(ApiResponse.ok("Attendance marked", service.markManual(
+                (String) body.get("username"), date, (String) body.get("status"), (String) body.get("markedBy"))));
+    }
+
     /** PATCH /api/v1/hr/attendance/{id} — admin correction of checkIn/checkOut times */
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<Attendance>> updateRecord(@PathVariable Long id, @RequestBody Map<String, Object> body) {
