@@ -34,21 +34,20 @@ public class OfficeExpenseService {
 
     private static final Set<AppUser.Role> MANAGERS = EnumSet.of(AppUser.Role.ADMIN, AppUser.Role.VP);
     private static final Set<AppUser.Role> VIEWERS  = EnumSet.of(AppUser.Role.ADMIN, AppUser.Role.VP, AppUser.Role.OH, AppUser.Role.CEO);
-    private static final BigDecimal DEFAULT_SALARY = new BigDecimal("4500");
 
     private final OfficeExpenseRepository repo;
     private final OfficeStaffRepository staffRepo;
     private final AppUserRepository userRepo;
     private final EmployeeRepository employeeRepo;
 
-    /** First run: the office staff paid ₹4,500 a month each, starting this month. */
+    /** First run: the Office Mgnt salary staff, starting this month (each month's amount is entered on its line). */
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void seedStaff() {
         if (staffRepo.count() > 0) return;
         String start = YearMonth.now().toString();
-        for (String[] s : new String[][] { { "Anusha", "VP" }, { "Bharath", "OH" }, { "Sunil", "CEO" }, { "Chinna Ponnu", "Office Staff" } }) {
-            staffRepo.save(OfficeStaff.builder().name(s[0]).designation(s[1]).monthlyAmount(DEFAULT_SALARY)
+        for (String[] s : new String[][] { { "Anusha", "VP" }, { "Bharath", "OH" }, { "Sunil", "CEO" } }) {
+            staffRepo.save(OfficeStaff.builder().name(s[0]).designation(s[1]).monthlyAmount(BigDecimal.ZERO)
                     .startMonth(start).active(true).build());
         }
     }
@@ -85,7 +84,7 @@ public class OfficeExpenseService {
             for (YearMonth m = YearMonth.parse(s.getStartMonth()); !m.isAfter(now); m = m.plusMonths(1)) {
                 if (repo.existsByKindAndStaffIdAndPeriodMonth("SALARY", s.getId(), m.toString())) continue;
                 repo.save(OfficeExpense.builder().kind("SALARY").periodMonth(m.toString()).category("Salary")
-                        .description("Salary – " + label(m)).payee(s.getName()).amount(s.getMonthlyAmount())
+                        .description("Salary – " + label(m)).payee(s.getName()).amount(BigDecimal.ZERO) // entered each month — salaries vary
                         .staffId(s.getId()).bankName(s.getBankName()).accountNumber(s.getAccountNumber()).ifsc(s.getIfsc())
                         .status("PENDING").raisedBy("Auto (monthly)").build());
             }
@@ -214,15 +213,14 @@ public class OfficeExpenseService {
         manager(actor);
         if (name == null || name.isBlank()) throw new RuntimeException("Enter the name");
         return staffRepo.save(OfficeStaff.builder().name(name.trim()).designation(trim(designation))
-                .monthlyAmount(amount == null ? DEFAULT_SALARY : amount)
+                .monthlyAmount(BigDecimal.ZERO) // not used — each month's amount is entered on its salary line
                 .startMonth(startMonth == null || startMonth.isBlank() ? YearMonth.now().toString() : YearMonth.parse(startMonth).toString())
                 .bankName(trim(bankName)).accountNumber(trim(accountNumber)).ifsc(upper(ifsc))
                 .active(true).build());
     }
 
     /**
-     * Change a staff member. A new monthly amount also updates their unpaid salary lines from this month on;
-     * earlier months keep what was calculated for them.
+     * Change a staff member. There is no fixed monthly amount — each month's salary is entered on its own line.
      */
     @Transactional
     public OfficeStaff updateStaff(Long id, String actor, String name, String designation, BigDecimal amount, Boolean active,
@@ -235,15 +233,6 @@ public class OfficeExpenseService {
         if (bankName != null) s.setBankName(trim(bankName));
         if (accountNumber != null) s.setAccountNumber(trim(accountNumber));
         if (ifsc != null) s.setIfsc(upper(ifsc));
-        if (amount != null) {
-            if (amount.signum() < 0) throw new RuntimeException("Amount can't be negative");
-            s.setMonthlyAmount(amount);
-            String from = YearMonth.now().toString();
-            repo.findAll().stream()
-                    .filter(e -> "SALARY".equals(e.getKind()) && id.equals(e.getStaffId()) && "PENDING".equals(e.getStatus())
-                            && e.getPeriodMonth().compareTo(from) >= 0)
-                    .forEach(e -> { e.setAmount(amount); repo.save(e); });
-        }
         OfficeStaff saved = staffRepo.save(s);
         syncSalaryBank();
         return saved;

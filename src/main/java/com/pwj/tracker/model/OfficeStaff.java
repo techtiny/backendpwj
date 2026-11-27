@@ -8,8 +8,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * A person paid a fixed monthly amount from office / management expenses (e.g. VP, OH, CEO, office helper).
- * A SALARY line is created in {@link OfficeExpense} for every month from {@code startMonth} up to the current month.
+ * A person paid a monthly salary from office / management expenses (e.g. VP, OH, CEO). The amount varies month to
+ * month, so each SALARY line starts at 0 and is entered for that month. A SALARY line is created in {@link OfficeExpense} for every month from {@code startMonth} up to the current month.
  */
 @Entity
 @Table(name = "hr_office_staff")
@@ -29,6 +29,7 @@ public class OfficeStaff {
     @Column(length = 60)
     private String designation;
 
+    /** Unused — kept for the existing column; each month's amount is entered on its salary line. */
     @Column(name = "monthly_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal monthlyAmount;
 
